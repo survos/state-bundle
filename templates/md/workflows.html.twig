@@ -1,0 +1,35 @@
+{# @SurvosWorkflow/md/workflows.html.twig #}
+
+Markdown for {{ workflowName }}
+
+![{{ workflowName }}](assets/{{ workflowName }}.svg)
+
+{% for transition, actions in eventsByTransition %}
+
+{% if actions.metadata is defined %}
+**Metadata:**
+{% for key, value in actions.metadata %}
+        - **{{ key|capitalize }}**: {{ value }}
+{% endfor %}
+{% endif %}
+
+---
+## Transition: {{ transition }}
+
+{% for action, handlers in actions %}
+### {{ transition }}.{{ action|capitalize }}
+
+{% for handler in handlers %}
+{{ handler.method }}()
+        // {{ handler.metadata.info??'' }}
+        // {{ handler.metadata.description??'' }}
+
+```php
+{{ handler.source|raw }}
+```
+[View source]({{ handler.link }})
+{% endfor %}
+
+{% endfor %}
+
+{% endfor %}
