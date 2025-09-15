@@ -1,6 +1,6 @@
 <?php
 
-namespace Survos\WorkflowBundle\Traits;
+namespace Survos\StateBundle\Traits;
 
 interface MarkingInterface
 {

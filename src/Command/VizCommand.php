@@ -1,11 +1,11 @@
 <?php
 
-namespace Survos\WorkflowBundle\Command;
+namespace Survos\StateBundle\Command;
 
 use Roave\BetterReflection\BetterReflection;
-use Survos\WorkflowBundle\Service\SurvosGraphVizDumper;
-use Survos\WorkflowBundle\Service\SurvosGraphVizDumper3;
-use Survos\WorkflowBundle\Service\WorkflowHelperService;
+use Survos\StateBundle\Service\SurvosGraphVizDumper;
+use Survos\StateBundle\Service\SurvosGraphVizDumper3;
+use Survos\StateBundle\Service\WorkflowHelperService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;

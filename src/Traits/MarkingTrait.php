@@ -1,6 +1,6 @@
 <?php
 
-namespace Survos\WorkflowBundle\Traits;
+namespace Survos\StateBundle\Traits;
 
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\OptionsResolver\OptionsResolver;
@@ -14,9 +14,15 @@ trait MarkingTrait
 {
     #[ORM\Column(type: 'string', length: 32, nullable: true)]
     #[Groups(['transition', 'minimum', 'marking','searchable'])]
-    private ?string $marking = null; // self::INITIAL_MARKING;
+    public ?string $marking = null; // self::INITIAL_MARKING;
 
-    private array $markingHistory = [];
+//    /** Mirror workflow marking into the base::$status for external tools. */
+//    public string $marking {
+//        get => $this->getMarking();
+//        set => ($this->setMarking($value), $this->status = $value);
+//    }
+
+private array $markingHistory = [];
 
     private ?\DateTime $lastTransitionTime = null;
 
@@ -45,7 +51,6 @@ trait MarkingTrait
     public function setMarking(?string $marking, $context = []): self
     {
         $this->marking = $marking;
-        // not persisted!
         return $this;
     }
 

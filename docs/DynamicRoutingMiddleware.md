@@ -37,11 +37,11 @@ MESSENGER_TRANSPORT_DSN=phpamqplib://guest:guest@localhost:5672/dummy
 Register the middleware in your `services.yaml`:
 
 ```yaml
-Survos\WorkflowBundle\Messenger\Middleware\DynamicRoutingMiddleware:
+Survos\StateBundle\Messenger\Middleware\DynamicRoutingMiddleware:
     tags:
         - { name: messenger.middleware, alias: dynamic_routing }
 
-dynamic_routing: '@Survos\WorkflowBundle\Messenger\Middleware\DynamicRoutingMiddleware'
+dynamic_routing: '@Survos\StateBundle\Messenger\Middleware\DynamicRoutingMiddleware'
 ```
 
 ### Messenger Configuration
@@ -86,7 +86,7 @@ framework:
         default_bus: messenger.bus.default
 
         routing:
-            'Survos\WorkflowBundle\Message\AsyncTransitionMessage': async
+            'Survos\StateBundle\Message\AsyncTransitionMessage': async
 ```
 
 ## Usage

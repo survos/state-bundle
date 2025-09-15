@@ -1,6 +1,6 @@
 <?php
 
-namespace Survos\WorkflowBundle\Service;
+namespace Survos\StateBundle\Service;
 
 // worth reading: https://sketchviz.com/flowcharts-in-graphviz
 

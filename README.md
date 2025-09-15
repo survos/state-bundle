@@ -15,8 +15,8 @@ for easyadmin integration, also see https://github.com/WandiParis/EasyAdminPlusB
 
 namespace App\Workflow;
 
-use Survos\WorkflowBundle\Attribute\Place;
-use Survos\WorkflowBundle\Attribute\Transition;
+use Survos\StateBundle\Attribute\Place;
+use Survos\StateBundle\Attribute\Transition;
 
 interface SubmissionWorkflowInterface
 {

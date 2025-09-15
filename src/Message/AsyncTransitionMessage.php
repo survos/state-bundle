@@ -1,6 +1,6 @@
 <?php
 
-namespace Survos\WorkflowBundle\Message;
+namespace Survos\StateBundle\Message;
 
 use JetBrains\PhpStorm\Deprecated;
 

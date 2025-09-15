@@ -1,8 +1,8 @@
 <?php
 
-namespace Survos\WorkflowBundle\Controller;
+namespace Survos\StateBundle\Controller;
 
-use Survos\WorkflowBundle\Traits\MarkingInterface;
+use Survos\StateBundle\Traits\MarkingInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Workflow\WorkflowInterface;
 

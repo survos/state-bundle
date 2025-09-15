@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Survos\WorkflowBundle\Service\ConfigureFromAttributesService;
+use Survos\StateBundle\Service\ConfigureFromAttributesService;
 use Symfony\Config\FrameworkConfig;
 
 return static function (FrameworkConfig $framework) {

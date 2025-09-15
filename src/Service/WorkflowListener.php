@@ -1,12 +1,12 @@
 <?php
 
-namespace Survos\WorkflowBundle\Service;
+namespace Survos\StateBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Survos\CoreBundle\Traits\QueryBuilderHelperInterface;
 use Survos\CoreBundle\Service\SurvosUtils;
-use Survos\WorkflowBundle\Message\TransitionMessage;
+use Survos\StateBundle\Message\TransitionMessage;
 use Symfony\Component\DependencyInjection\Attribute\AutowireLocator;
 use Symfony\Component\DependencyInjection\Attribute\TaggedLocator;
 use Symfony\Component\DependencyInjection\ServiceLocator;

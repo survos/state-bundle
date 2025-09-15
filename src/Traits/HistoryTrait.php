@@ -1,7 +1,7 @@
 <?php
 
 
-namespace Survos\WorkflowBundle\Traits;
+namespace Survos\StateBundle\Traits;
 
 use Gedmo\Loggable\Entity\LogEntry;
 

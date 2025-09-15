@@ -1,12 +1,12 @@
 <?php
 
 
-namespace Survos\WorkflowBundle\Traits;
+namespace Survos\StateBundle\Traits;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Survos\CoreBundle\Traits\JsonResponseTrait;
-use Survos\WorkflowBundle\Service\WorkflowHelperService;
-use Survos\WorkflowBundle\Traits\MarkingInterface;
+use Survos\StateBundle\Service\WorkflowHelperService;
+use Survos\StateBundle\Traits\MarkingInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 

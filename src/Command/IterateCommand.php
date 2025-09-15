@@ -1,14 +1,14 @@
 <?php
 
-namespace Survos\WorkflowBundle\Command;
+namespace Survos\StateBundle\Command;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Survos\CoreBundle\Traits\QueryBuilderHelperInterface;
-use Survos\WorkflowBundle\Event\RowEvent;
-use Survos\WorkflowBundle\Message\TransitionMessage;
-use Survos\WorkflowBundle\Service\WorkflowHelperService;
+use Survos\StateBundle\Event\RowEvent;
+use Survos\StateBundle\Message\TransitionMessage;
+use Survos\StateBundle\Service\WorkflowHelperService;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;

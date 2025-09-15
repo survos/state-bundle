@@ -1,11 +1,11 @@
 <?php
 
-namespace Survos\WorkflowBundle\Controller;
+namespace Survos\StateBundle\Controller;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Survos\CoreBundle\Traits\QueryBuilderHelperInterface;
-use Survos\WorkflowBundle\Service\WorkflowHelperService;
-use Survos\WorkflowBundle\Traits\MarkingInterface;
+use Survos\StateBundle\Service\WorkflowHelperService;
+use Survos\StateBundle\Traits\MarkingInterface;
 use Symfony\Bridge\Twig\Attribute\Template;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;

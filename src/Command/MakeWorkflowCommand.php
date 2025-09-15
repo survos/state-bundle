@@ -1,12 +1,12 @@
 <?php
 
-namespace Survos\WorkflowBundle\Command;
+namespace Survos\StateBundle\Command;
 
 use Nette\PhpGenerator\Literal;
 use Nette\PhpGenerator\PhpNamespace;
 use Nette\PhpGenerator\Type;
 use ReflectionClass;
-use Survos\WorkflowBundle\Attribute\Place;
+use Survos\StateBundle\Attribute\Place;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
@@ -16,8 +16,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\DependencyInjection\Attribute\When;
 use Symfony\Component\DependencyInjection\Attribute\WhenNot;
 use Twig\Environment;
-use Survos\WorkflowBundle\Attribute\Transition;
-use Survos\WorkflowBundle\Attribute\Workflow;
+use Survos\StateBundle\Attribute\Transition;
+use Survos\StateBundle\Attribute\Workflow;
 use Symfony\Component\Workflow\Attribute\AsGuardListener;
 use Symfony\Component\Workflow\Attribute\AsTransitionListener;
 use Symfony\Component\Workflow\Event\GuardEvent;

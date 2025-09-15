@@ -1,8 +1,8 @@
 <?php
 
-namespace Survos\WorkflowBundle\Twig;
+namespace Survos\StateBundle\Twig;
 
-use Survos\WorkflowBundle\Service\WorkflowHelperService;
+use Survos\StateBundle\Service\WorkflowHelperService;
 use Symfony\Component\Workflow\Transition;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;

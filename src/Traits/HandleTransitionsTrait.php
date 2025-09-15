@@ -1,9 +1,9 @@
 <?php
 
-namespace Survos\WorkflowBundle\Traits;
+namespace Survos\StateBundle\Traits;
 
 use Survos\BootstrapBundle\Entity\SurvosBaseEntity;
-use Survos\WorkflowBundle\Message\TransitionMessage;
+use Survos\StateBundle\Message\TransitionMessage;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Workflow\Transition;
 use Symfony\Component\Workflow\WorkflowInterface;

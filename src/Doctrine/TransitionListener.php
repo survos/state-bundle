@@ -3,14 +3,14 @@ declare(strict_types=1);
 
 // if enabled, this loads the enabledTransitions into the entity, nice for browsing.
 
-namespace Survos\WorkflowBundle\Doctrine;
+namespace Survos\StateBundle\Doctrine;
 
 use App\Entity\Article;
 use Doctrine\ORM\Event\LifecycleEventArgs;
 use Doctrine\ORM\Event\PostLoadEventArgs;
 use Psr\Log\LoggerInterface;
-use Survos\WorkflowBundle\Service\WorkflowHelperService;
-use Survos\WorkflowBundle\Traits\MarkingInterface;
+use Survos\StateBundle\Service\WorkflowHelperService;
+use Survos\StateBundle\Traits\MarkingInterface;
 use Symfony\Component\Workflow\Transition;
 use Symfony\Component\Workflow\WorkflowInterface;
 

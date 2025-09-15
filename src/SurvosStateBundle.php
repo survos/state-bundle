@@ -1,24 +1,24 @@
 <?php
 
-namespace Survos\WorkflowBundle;
+namespace Survos\StateBundle;
 
 use JetBrains\PhpStorm\NoReturn;
 use Survos\CoreBundle\Traits\HasAssetMapperTrait;
-use Survos\WorkflowBundle\Command\ConvertFromYamlCommand;
-use Survos\WorkflowBundle\Command\Iterate72Command;
-use Survos\WorkflowBundle\Command\IterateCommand;
-use Survos\WorkflowBundle\Command\MakeWorkflowCommand;
-use Survos\WorkflowBundle\Command\SurvosWorkflowConfigureCommand;
-use Survos\WorkflowBundle\Command\SurvosWorkflowDumpCommand;
-use Survos\WorkflowBundle\Command\VizCommand;
-use Survos\WorkflowBundle\Controller\WorkflowController;
-use Survos\WorkflowBundle\Doctrine\TransitionListener;
-use Survos\WorkflowBundle\Service\ConfigureFromAttributesService;
-use Survos\WorkflowBundle\Service\SurvosGraphVizDumper3;
-use Survos\WorkflowBundle\Service\WorkflowHelperService;
-use Survos\WorkflowBundle\Service\WorkflowListener;
-use Survos\WorkflowBundle\Twig\WorkflowExtension;
-use Survos\WorkflowBundle\Messenger\Middleware\DynamicRoutingMiddleware;
+use Survos\StateBundle\Command\ConvertFromYamlCommand;
+use Survos\StateBundle\Command\Iterate72Command;
+use Survos\StateBundle\Command\IterateCommand;
+use Survos\StateBundle\Command\MakeWorkflowCommand;
+use Survos\StateBundle\Command\SurvosWorkflowConfigureCommand;
+use Survos\StateBundle\Command\SurvosWorkflowDumpCommand;
+use Survos\StateBundle\Command\VizCommand;
+use Survos\StateBundle\Controller\WorkflowController;
+use Survos\StateBundle\Doctrine\TransitionListener;
+use Survos\StateBundle\Service\ConfigureFromAttributesService;
+use Survos\StateBundle\Service\SurvosGraphVizDumper3;
+use Survos\StateBundle\Service\WorkflowHelperService;
+use Survos\StateBundle\Service\WorkflowListener;
+use Survos\StateBundle\Twig\WorkflowExtension;
+use Survos\StateBundle\Messenger\Middleware\DynamicRoutingMiddleware;
 use Survos\WorkflowHelperBundle\Attribute\Workflow;
 use Symfony\Bundle\FrameworkBundle\Command\WorkflowDumpCommand;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
@@ -38,10 +38,10 @@ use Symfony\Component\Workflow\Registry;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_locator;
 
-class SurvosWorkflowBundle extends AbstractBundle implements CompilerPassInterface
+class SurvosStateBundle extends AbstractBundle implements CompilerPassInterface
 {
     use HasAssetMapperTrait;
-    
+
     public function getAlias(): string
     {
         return 'survos_workflow';

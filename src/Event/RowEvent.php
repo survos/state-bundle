@@ -1,9 +1,9 @@
 <?php
 
 
-namespace Survos\WorkflowBundle\Event;
+namespace Survos\StateBundle\Event;
 
-use Survos\WorkflowBundle\Command\IterateCommand;
+use Survos\StateBundle\Command\IterateCommand;
 use Symfony\Contracts\EventDispatcher\Event;
 
 class RowEvent extends Event

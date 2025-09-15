@@ -1,6 +1,6 @@
 <?php
 
-namespace Survos\WorkflowBundle\Service;
+namespace Survos\StateBundle\Service;
 
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\Workflow\Definition;

@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Survos\WorkflowBundle\Renderer;
+namespace Survos\StateBundle\Renderer;
 
 use Doctrine\Inflector\Inflector;
 use Symfony\Bundle\MakerBundle\Generator;

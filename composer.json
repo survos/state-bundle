@@ -47,7 +47,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Survos\\WorkflowBundle\\": "src/"
+            "Survos\\StateBundle\\": "src/"
         }
     },
     "extra": {

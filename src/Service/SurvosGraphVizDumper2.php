@@ -1,6 +1,6 @@
 <?php
 
-namespace Survos\WorkflowBundle\Service;
+namespace Survos\StateBundle\Service;
 
 use Symfony\Component\Workflow\Definition;
 use Symfony\Component\Workflow\Dumper\GraphvizDumper;

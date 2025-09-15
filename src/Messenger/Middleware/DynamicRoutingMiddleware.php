@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Survos\WorkflowBundle\Messenger\Middleware;
+namespace Survos\StateBundle\Messenger\Middleware;
 
-use Survos\WorkflowBundle\Message\TransitionMessage;
+use Survos\StateBundle\Message\TransitionMessage;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Middleware\MiddlewareInterface;
 use Symfony\Component\Messenger\Middleware\StackInterface;

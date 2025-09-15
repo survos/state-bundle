@@ -1,6 +1,6 @@
 <?php
 
-namespace Survos\WorkflowBundle\Attribute;
+namespace Survos\StateBundle\Attribute;
 
 use Attribute;
 

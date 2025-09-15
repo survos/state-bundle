@@ -1,10 +1,10 @@
 <?php
 
-namespace Survos\WorkflowBundle\Service;
+namespace Survos\StateBundle\Service;
 
-use Survos\WorkflowBundle\Attribute\Place;
-use Survos\WorkflowBundle\Attribute\Transition;
-use Survos\WorkflowBundle\Attribute\Workflow;
+use Survos\StateBundle\Attribute\Place;
+use Survos\StateBundle\Attribute\Transition;
+use Survos\StateBundle\Attribute\Workflow;
 use Symfony\Config\FrameworkConfig;
 class ConfigureFromAttributesService
 {

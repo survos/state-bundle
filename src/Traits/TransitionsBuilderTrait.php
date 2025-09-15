@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 
-namespace Survos\WorkflowBundle\Traits;
+namespace Survos\StateBundle\Traits;
 
 use Survos\BootstrapBundle\Entity\SurvosBaseEntity;
 use Symfony\Component\Form\Extension\Core\Type\SubmitType;
