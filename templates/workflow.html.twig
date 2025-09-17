@@ -1,4 +1,4 @@
-{% extends '@SurvosWorkflow/layout.html.twig' %}
+{% extends '@SurvosState/layout.html.twig' %}
 
 
 
@@ -91,7 +91,7 @@
         <div class="row-fluid">
             <div class="col-lg-12 col-md-12 col-sm-12" >
                 {% if allowTransitions %}
-                    {% include "@SurvosWorkflow/workflow_transitions.html.twig" with {entity: entity, class: class, transitions: definition.transitions} %}
+                    {% include "@SurvosState/workflow_transitions.html.twig" with {entity: entity, class: class, transitions: definition.transitions} %}
                 {% endif %}
                 {#
 

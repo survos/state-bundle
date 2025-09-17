@@ -1,145 +1,144 @@
 <?php
+declare(strict_types=1);
 
 namespace Survos\StateBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
-use Survos\CoreBundle\Traits\QueryBuilderHelperInterface;
-use Survos\CoreBundle\Service\SurvosUtils;
+use Psr\Log\NullLogger;
 use Survos\StateBundle\Message\TransitionMessage;
 use Symfony\Component\DependencyInjection\Attribute\AutowireLocator;
-use Symfony\Component\DependencyInjection\Attribute\TaggedLocator;
 use Symfony\Component\DependencyInjection\ServiceLocator;
-use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
-use Symfony\Component\Process\Process;
 use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
 use Symfony\Component\Workflow\Attribute\AsCompletedListener;
 use Symfony\Component\Workflow\Attribute\AsEnteredListener;
-use Symfony\Component\Workflow\Attribute\AsEnterListener;
-use Symfony\Component\Workflow\Dumper\GraphvizDumper;
-use Symfony\Component\Workflow\Dumper\StateMachineGraphvizDumper;
 use Symfony\Component\Workflow\Event\CompletedEvent;
 use Symfony\Component\Workflow\Event\EnteredEvent;
-use Symfony\Component\Workflow\Marking;
-use Symfony\Component\Workflow\Registry;
-use Symfony\Component\Workflow\StateMachine;
-use Symfony\Component\Workflow\SupportStrategy\InstanceOfSupportStrategy;
-use Symfony\Component\Workflow\Workflow;
 use Symfony\Component\Workflow\WorkflowInterface;
-use Symfony\Contracts\Translation\TranslatorInterface;
 use Zenstruck\Messenger\Monitor\Stamp\DescriptionStamp;
 use Zenstruck\Messenger\Monitor\Stamp\TagStamp;
 
-/**
- * Global Workflow Listeners
- *
- * @author Tac Tacelosky <tacman@gmail.com>
- */
-class WorkflowListener
+final class WorkflowListener
 {
     public function __construct(
         /** @var WorkflowInterface[] */
         #[AutowireLocator('workflow.state_machine')] private ServiceLocator $workflows,
-        private WorkflowHelperService                                       $workflowHelperService,
-        private PropertyAccessorInterface                                   $propertyAccessor,
-        private MessageBusInterface                                         $messageBus,
+        private WorkflowHelperService $workflowHelperService,
+        private PropertyAccessorInterface $propertyAccessor,
+        private MessageBusInterface $messageBus,
         private EntityManagerInterface $entityManager,
-        private ?LoggerInterface                                            $logger = null,
-    )
-    {
-    }
+        private AsyncQueueLocator $asyncQueueLocator,
+        private LoggerInterface $logger = new NullLogger(),
+    ) {}
 
-    private function getWorkflowsFromTaggedIterator(): iterable
-    {
-        return $this->workflows;
-    }
-
-    #[AsEnterListener]
+    #[AsEnteredListener]
     public function onEntered(EnteredEvent $event): void
     {
-//        !empty($event->getContext()) && dd($event->getContext());
-        $subject = $event->getSubject();
-        $workflow = $this->workflowHelperService->getWorkflow($event->getSubject(), $event->getWorkflowName());
-        $currentPlace = array_keys($workflow->getMarking($subject)->getPlaces())[0];
-        $next = $event->getMetadata('next', $currentPlace);
-        foreach ($next??[] as $nextTransition) {
-            if ($workflow->can($subject, $nextTransition))
-            {
-                $this->transition($workflow, $subject, $nextTransition);
-                break; // stop after the first one, since it's async
+        $subject  = $event->getSubject();
+        $workflow = $this->workflowHelperService->getWorkflow($subject, $event->getWorkflowName());
+
+        $currentPlace = array_keys($workflow->getMarking($subject)->getPlaces())[0] ?? null;
+        $meta = $this->workflowHelperService->getPlaceMetadata($currentPlace, $workflow);
+        if (!$currentPlace) {
+            return;
+        }
+
+        $next = (array) ($event->getMetadata('next', $currentPlace) ?? []);
+        foreach ($next as $transition) {
+            if (!$workflow->can($subject, $transition)) {
+                continue;
             }
+            $this->dispatchTransition($workflow, $subject, $transition, $currentPlace);
+            // Sequential semantics: stop after first applicable next
+            break;
         }
-    }
-
-    private function transition(WorkflowInterface $workflow, mixed $subject, string $transition)
-    {
-        // we need the next transport of the _next_ transition
-//                $nextTransport = $event->getMetadata('transport', $nextTransition);
-        $transitionMeta = $this->workflowHelperService->getTransitionMetadata($transition, $workflow);
-        $nextTransport = $transitionMeta['transport']??null;
-        $nextTransport ??= 'async';
-        $stamps = [];
-        if (class_exists(TagStamp::class)) {
-            $stamps[] = new TagStamp($transition);
-        }
-
-        if ($nextTransport) {
-            $stamps[] = new TransportNamesStamp($nextTransport);
-        }
-        // always?
-        // add getId() if id isn't the pk.
-        $id = $this->propertyAccessor->getValue($subject, 'id');
-        $msg = new TransitionMessage(
-            $id,
-            $subject::class,
-            $transition,
-            $workflow->getName()
-        );
-        $currentPlace = array_keys($workflow->getMarking($subject)->getPlaces())[0];
-        if (class_exists(DescriptionStamp::class)) {
-            $stamps[] = new DescriptionStamp(sprintf("Next/%s-%s @%s: %s",
-                new \ReflectionClass($subject)->getShortName(),
-                $id,
-                $currentPlace,
-                $transition
-            ));
-        }
-        // if the transport is async, we need to make sure the em is flushed.
-        $this->entityManager->flush();
-        $env = $this->messageBus->dispatch($msg, $stamps);
-//        dd($msg, $env, $stamps);
     }
 
     #[AsCompletedListener]
     public function onCompleted(CompletedEvent $event): void
     {
-        $transition = $event->getTransition();
-        $workflow = $this->workflowHelperService->getWorkflow($event->getSubject(), $event->getWorkflowName());
-//        $workflow = $event->getWorkflow();
-        foreach ($event->getMetadata('next', $transition)??[] as $nextTransition) {
-            $object = $event->getSubject();
-            if ($workflow->can($object, $nextTransition))
-            {
-                $this->transition($workflow, $object, $nextTransition);
+        $subject   = $event->getSubject();
+        $workflow  = $this->workflowHelperService->getWorkflow($subject, $event->getWorkflowName());
+        $fromTrans = $event->getTransition();
 
-//                } else {
-//                    // we don't get the log
-//                    $workflow->apply($event->getSubject(), $nextTransition);
-//                    break; // stop dispatching after first match
-//                }
-
-                // getId()??  getKey()?  so that async messages have an id
-//                dd($nextTransition, $nextTransport, $stamps, $msg);
-//                dd(msg: $msg, env: $env, nextTransport: $nextTransport, nextTransition: $nextTransition);
-            } else {
-                $this->logger->warning("Cannot transition " . $object::class . "  to $nextTransition from " . $object->getMarking());
+        $next = (array) ($event->getMetadata('next', $fromTrans) ?? []);
+        foreach ($next as $transition) {
+            if (!$workflow->can($subject, $transition)) {
+                $this->logger->info("Skipping transition $subject::class $transition");
+                continue;
             }
+            $currentPlace = array_keys($workflow->getMarking($subject)->getPlaces())[0] ?? '(unknown)';
+            $this->dispatchTransition($workflow, $subject, $transition, $currentPlace);
+            // Sequential semantics: stop after first applicable next
+            break;
         }
-//        dd($transition, $event->getWorkflowName());
-
-
     }
 
+    private function dispatchTransition(WorkflowInterface $workflow, object $subject, string $transition, ?string $atPlace = null): void
+    {
+        $stamps = [];
+
+        // add queue stamp automatically if async
+        if ($this->asyncQueueLocator->isAsync($transition)) {
+            $stamps = array_merge($stamps, $this->asyncQueueLocator->stampsFor($transition));
+        }
+
+        if (class_exists(TagStamp::class)) {
+            $stamps[] = new TagStamp($transition);
+        }
+        if (class_exists(DescriptionStamp::class)) {
+            $short = (new \ReflectionClass($subject))->getShortName();
+            $id    = $this->resolveId($subject);
+            $stamps[] = new DescriptionStamp(sprintf('Next/%s-%s @%s: %s', $short, (string)$id, (string)$atPlace, $transition));
+        }
+
+        $id = $this->resolveId($subject);
+        if ($id === null) {
+            $this->logger->warning('WorkflowListener: cannot resolve id for subject', ['class' => $subject::class]);
+            return;
+        }
+
+        $message = new TransitionMessage(
+            $id,
+            $subject::class,
+            $transition,
+            $workflow->getName()
+        );
+
+        // If async, flush before queuing so downstream sees persisted state
+        if ($this->asyncQueueLocator->isAsync($transition)) {
+            $this->entityManager->flush();
+        }
+
+        $this->messageBus->dispatch($message, $stamps);
+    }
+
+    private function resolveId(object $entity): string|int|null
+    {
+        // Try "id" via PropertyAccessor?
+        try {
+            $val = $this->propertyAccessor->getValue($entity, 'id');
+            if ($val !== null) {
+                return $val;
+            }
+        } catch (\Throwable) {
+            // fall back to Doctrine metadata
+        }
+
+        try {
+            $meta = $this->entityManager->getClassMetadata($entity::class);
+            $ids  = $meta->getIdentifierValues($entity);
+            if (!$ids) {
+                return null;
+            }
+            if (\count($ids) === 1) {
+                return (string) \array_values($ids)[0];
+            }
+            return json_encode($ids, JSON_UNESCAPED_SLASHES) ?: null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
 }

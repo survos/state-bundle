@@ -8,6 +8,7 @@ use Psr\Log\LoggerInterface;
 use Survos\CoreBundle\Traits\QueryBuilderHelperInterface;
 use Survos\StateBundle\Event\RowEvent;
 use Survos\StateBundle\Message\TransitionMessage;
+use Survos\StateBundle\Service\AsyncQueueLocator;
 use Survos\StateBundle\Service\WorkflowHelperService;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -28,7 +29,7 @@ use Zenstruck\Alias;
 use Zenstruck\Messenger\Monitor\Stamp\DescriptionStamp;
 use Zenstruck\Messenger\Monitor\Stamp\TagStamp;
 
-#[AsCommand('workflow:iterate', 'Iterate a Doctrine entity and dispatch workflow transitions.', aliases: ['iterate'])]
+#[AsCommand('state:iterate', 'Iterate a Doctrine entity and dispatch workflow transitions.', aliases: ['iterate'])]
 final class IterateCommand extends Command
 {
     public function __construct(
@@ -39,6 +40,7 @@ final class IterateCommand extends Command
         private EntityManagerInterface $entityManager,
         private ManagerRegistry $doctrine,
         private PropertyAccessorInterface $propertyAccessor,
+        private AsyncQueueLocator $asyncQueueLocator,
         #[Autowire('%env(DEFAULT_TRANSPORT)%')] private ?string $defaultTransport = null,
     ) {
         parent::__construct();
@@ -59,6 +61,7 @@ final class IterateCommand extends Command
         #[Option('Comma-separated property paths to dump for each row', shortcut: 'd')] string $dump = '',
         #[Option('grid:index after flush?')] ?bool $indexAfterFlush = null,
         #[Option('Show counts per marking and exit', shortcut: 's')] ?bool $stats = null,
+        #[Option('force sync (no queues)', shortcut: 'y')] ?bool $sync = null,
         #[Option('Process at most this many items', shortcut: 'x')] int $max = 0,
         #[Option('[deprecated] Use --max instead')] int $limit = 0,
         #[Option('Use this count for progress bar', shortcut: 'c')] int $count = 0,
@@ -67,6 +70,9 @@ final class IterateCommand extends Command
         if ($limit) {
             $io->warning('--limit is deprecated; use --max.');
             $max = $limit;
+        }
+        if ($sync) {
+            $this->asyncQueueLocator->sync = true;
         }
 
         // Resolve/select entity class
@@ -181,12 +187,19 @@ final class IterateCommand extends Command
         $shortClass = (new \ReflectionClass($className))->getShortName();
 
         if ($workflow && $transition) {
-            $wfMeta = $this->workflowHelperService->getTransitionMetadata($transition, $workflow);
-            $transport ??= $wfMeta['transport'] ?? $this->defaultTransport;
+
+            if ($this->asyncQueueLocator->isAsync($transition)) {
+                $stamps = array_merge($stamps, $this->asyncQueueLocator->stampsFor($transition));
+            }
+////            $this->bus->dispatch(new TransitionMessage(...), $stamps);
+//
+//            $wfMeta = $this->workflowHelperService->getTransitionMetadata($transition, $workflow);
+//            assert($wfMeta['transport']);
+//            $transport ??= $wfMeta['transport'] ?? $this->defaultTransport;
         }
-        if ($transport) {
-            $stamps[] = new TransportNamesStamp([$transport]);
-        }
+//        if ($transport) {
+//            $stamps[] = new TransportNamesStamp([$transport]);
+//        }
         if (class_exists(TagStamp::class)) {
             $stamps[] = new TagStamp($transition ?? 'iterate');
         }

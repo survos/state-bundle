@@ -45,7 +45,7 @@ class WorkflowController extends AbstractController
     {
         $workflowsGroupedByCode = $this->workflowHelperService->getWorkflowsIndexedByName();
         $workflowsGroupedByClass = $this->workflowHelperService->getWorkflowsGroupedByClass();
-        return $this->render("@SurvosWorkflow/index.html.twig", [
+        return $this->render("@SurvosState/index.html.twig", [
             'configs' => $this->workflowHelperService->getWorkflowConfiguration(),
             'workflowsGroupedByClass' => $workflowsGroupedByClass,
             'workflowsByCode' => $workflowsGroupedByCode,
@@ -53,7 +53,7 @@ class WorkflowController extends AbstractController
     }
 
     #[Route('/entities', name: 'survos_workflow_entities')]
-    #[Template('@SurvosWorkflow/entities.html.twig')]
+    #[Template('@SurvosState/entities.html.twig')]
     public function entitiesGraph(): Response|array
     {
         $charts = [];
@@ -244,7 +244,7 @@ class WorkflowController extends AbstractController
         $dumper = $this->workflowHelperService->workflowDiagramDigraph($entity, $flowCode, 'TB');
 
         // group by class
-        return $this->render('@SurvosWorkflow/d3-workflow.html.twig', $params + [
+        return $this->render('@SurvosState/d3-workflow.html.twig', $params + [
                 'digraph' => $dumper,
                 // 'workflows' => $workflows['workflow']['workflows'],
             ]);

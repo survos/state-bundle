@@ -1,5 +1,5 @@
-survos_workflow:
+survos_state:
   type: attribute
   resource:
-    path: '@SurvosWorkflowBundle/src/Controller/'
+    path: '@SurvosStateBundle/src/Controller/'
     namespace: Survos\StateBundle\Controller

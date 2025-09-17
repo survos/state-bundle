@@ -151,7 +151,7 @@ PHP, $shortName));
             ->addParameter('event')
             ->setType(GuardEvent::class);
         // this would be an appropriate spot for twig
-        $body = $this->twig->render('@SurvosWorkflow/_guard_switch.php.twig', $params = [
+        $body = $this->twig->render('@SurvosState/_guard_switch.php.twig', $params = [
             'shortName' => $shortName,
             'varName' => lcfirst($shortName),
             'entityClassName' => $entityClassName,
@@ -174,7 +174,7 @@ PHP, $shortName));
             $method
                 ->addParameter('event')
                 ->setType(TransitionEvent::class);
-            $body = $this->twig->render('@SurvosWorkflow/_transition_body.php.twig', $params);
+            $body = $this->twig->render('@SurvosState/_transition_body.php.twig', $params);
             $method->setBody($body);
 //            dd((string)$method);
         }

@@ -83,6 +83,11 @@ class WorkflowHelperService
         ], $workflow->getMetadataStore()->getPlaceMetadata($marking)), $workflow->getDefinition()->getPlaces());
     }
 
+    public function getPlaceMetadata(string $placeName, WorkflowInterface $workflow): array
+    {
+        return $workflow->getMetadataStore()->getPlaceMetadata($placeName);
+    }
+
     public function getTransitionMetadata(string $transitionName, WorkflowInterface $workflow): array
     {
         // Get all transitions
@@ -358,7 +363,6 @@ ORDER BY n.nspname, c.relname;");
 
 
     #[AsMessageHandler]
-    // @todo: make sure this is property configured in SurvosWorkflowBundle
     public function handleTransition(TransitionMessage $message)
     {
         if (!$object = $this->entityManager->find($message->getClassName(), $message->getId())) {
@@ -372,6 +376,8 @@ ORDER BY n.nspname, c.relname;");
         if (!$flowName = $message->getWorkflow()) {
             // ..
         }
+
+//        dump($message->getTransitionName(), $message->getClassName(), $message->getId());
 
         $shortName = new \ReflectionClass($message->getClassName())->getShortName();
         $id = $message->getId();

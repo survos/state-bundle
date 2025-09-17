@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides details on implementing and using the `DynamicRoutingMiddleware` within the Survos WorkflowBundle for a single exchange message routing configuration in Symfony Messenger with RabbitMQ.
+This document provides details on implementing and using the `DynamicRoutingMiddleware` within the Survos StateBundle for a single exchange message routing configuration in Symfony Messenger with Doctrine (and someday RabbitMQ).
 
 ## Purpose
 
@@ -12,7 +12,7 @@ The middleware enables runtime transport selection using `TransportNamesStamp` w
 
 - **Dynamic Transport Selection**: Override default message routing at runtime.
 - **Single Exchange Configuration**: All queues use a single exchange for efficient resource usage.
-- **Integration with Survos WorkflowBundle**: Works seamlessly within existing workflow transitions.
+- **Integration with Survos StateBundle**: Works seamlessly within existing workflow transitions.
 
 ## Installation
 

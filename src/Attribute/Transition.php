@@ -15,6 +15,7 @@ class Transition
         public ?string $guard=null,
         public ?array $metadata=[],
         public ?string $transport=null,
+        public ?bool $async=null,
         public ?array $next=[],
 
     ) {
@@ -27,8 +28,12 @@ class Transition
         if ($this->description) {
             $this->metadata['description'] = $this->description;
         }
+        if ($this->async) {
+            $this->metadata['async'] = true;
+        }
         if ($this->transport) {
-            $this->metadata['transport'] = $this->transport;
+            $this->metadata['transport'] = $this->transport; // deprecated
+            $this->metadata['async'] = ($this->transport <> 'sync');
         }
         if ($this->next) {
             $this->metadata['next'] = $this->next;

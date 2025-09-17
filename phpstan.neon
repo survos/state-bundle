@@ -2,7 +2,7 @@ parameters:
     level: 0
     inferPrivatePropertyTypeFromConstructor: true
     paths:
-        - ./src/Controller
+        - ./src
 
     excludePaths:
        analyse:

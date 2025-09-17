@@ -181,7 +181,7 @@ EOF
         }
 
         foreach ($collected as $wf => $transitions) {
-            $md = $this->twig->render('@SurvosWorkflow/md/workflows.html.twig', [
+            $md = $this->twig->render('@SurvosState/md/workflows.html.twig', [
                 'workflowName'       => $wf,
                 'eventsByTransition' => $transitions,
             ]);

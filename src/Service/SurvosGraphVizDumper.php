@@ -463,6 +463,7 @@ class SurvosGraphVizDumper extends GraphvizDumper
                         // ignore, since the node is going to be that color
                         break;
                     default:
+                        if (is_array($value)) {dd($value, $key);}
                         $code[] = \sprintf('%s%s: %s', '<BR/>', $this->escape($key), $this->escape($value));
 
                 }

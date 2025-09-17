@@ -19,7 +19,7 @@ export default class extends Controller {
 
     connect() {
         // never got this working :-(
-        let msg = 'Hello from @survos/workflow-bundle: ' + this.identifier;
+        let msg = 'Hello from @survos/state-bundle: ' + this.identifier;
         // this.show();
         // graphviz(this.graphTarget).renderDot(`digraph{a->b}`);
     }

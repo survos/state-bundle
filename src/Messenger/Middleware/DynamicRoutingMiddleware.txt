@@ -1,0 +1,72 @@
+<?php
+declare(strict_types=1);
+
+namespace Survos\StateBundle\Messenger\Middleware;
+
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+use Survos\StateBundle\Message\TransitionMessage;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Middleware\MiddlewareInterface;
+use Symfony\Component\Messenger\Middleware\StackInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
+use Symfony\Component\Messenger\Stamp\ReceivedStamp;
+use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
+use Jwage\PhpAmqpLibMessengerBundle\Transport\AmqpStamp;
+
+final class DynamicRoutingMiddleware implements MiddlewareInterface
+{
+
+    public function __construct(private ?LoggerInterface $logger = null)
+    {
+        $this->logger = $logger ?? new NullLogger();
+    }
+
+    public function handle(Envelope $envelope, StackInterface $stack): Envelope
+    {
+        // only while SENDING (not after receive/handle)
+        if ($envelope->last(ReceivedStamp::class) || $envelope->last(HandledStamp::class)) {
+            return $stack->next()->handle($envelope, $stack);
+        }
+
+        $msg = $envelope->getMessage();
+        $tn  = $envelope->last(TransportNamesStamp::class);
+
+        $this->logger->debug('[DynamicRouting] enter', [
+            'message_class' => $msg::class,
+            'transition'    => $msg instanceof TransitionMessage ? $msg->getTransitionName() : null,
+            'transports'    => $tn ? $tn->getTransportNames() : [],
+            'has_amqp'      => (bool) $envelope->last(AmqpStamp::class),
+        ]);
+
+        if (!$msg instanceof TransitionMessage) {
+            $this->logger->debug('[DynamicRouting] not a TransitionMessage, passing through');
+            return $stack->next()->handle($envelope, $stack);
+        }
+
+        // If no targeted sender: will run sync — don't stamp.
+        if (!$tn) {
+            $this->logger->debug('[DynamicRouting] no TransportNamesStamp (sync fallback), not stamping');
+            return $stack->next()->handle($envelope, $stack);
+        }
+
+        // Respect existing AmqpStamp
+        if ($envelope->last(AmqpStamp::class)) {
+            $this->logger->debug('[DynamicRouting] AmqpStamp already present, not overriding');
+            return $stack->next()->handle($envelope, $stack);
+        }
+
+        $routingKey = $msg->getTransitionName(); // download|resize|archive|...
+        $this->logger->debug('[DynamicRouting] stamping routing key', [
+            'routing_key' => $routingKey,
+        ]);
+
+        $envelope = $envelope->with(new AmqpStamp($routingKey));
+
+        $this->logger->debug('[DynamicRouting] exit (stamped)', [
+            'routing_key' => $routingKey,
+        ]);
+
+        return $stack->next()->handle($envelope, $stack);
+    }
+}
