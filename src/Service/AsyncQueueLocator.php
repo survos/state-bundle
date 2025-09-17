@@ -3,41 +3,75 @@ declare(strict_types=1);
 
 namespace Survos\StateBundle\Service;
 
+use Survos\StateBundle\Util\QueueNameUtil;
 use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 
 final class AsyncQueueLocator
 {
-    // override this to force the 'sync' transport and skip queuing, e.g. iterate Pokemon --sync
-    public bool $sync=false;
+    public bool $sync = false;
 
-    /** @param array<string,string> $transitionToQueueMap */
-    public function __construct(private readonly array $transitionToQueueMap) {
-    }
+    /**
+     * @param array<string, array<string, string>> $map  e.g. ['media' => ['download' => 'media.download']]
+     */
+    public function __construct(private readonly array $map) {}
 
-    public function isAsync(string $transition): bool
+    // --- Primary (workflow-aware) API ---------------------------------------
+
+    public function isAsync(string $workflow, string $transition): bool
     {
-        // OR we could send the sync stamp...
         if ($this->sync) {
             return false;
         }
-        return isset($this->transitionToQueueMap[$transition]);
+        [$wf, $tr] = QueueNameUtil::normalizePair($workflow, $transition);
+        return isset($this->map[$wf][$tr]);
     }
 
-    public function queueFor(string $transition): ?string
+    public function queueFor(string $workflow, string $transition): ?string
     {
-        return $this->transitionToQueueMap[$transition] ?? null;
+        [$wf, $tr] = QueueNameUtil::normalizePair($workflow, $transition);
+        return $this->map[$wf][$tr] ?? null;
     }
 
     /** @return TransportNamesStamp[] */
-    public function stampsFor(string $transition): array
+    public function stampsFor(string $workflow, string $transition): array
     {
-        $q = $this->queueFor($transition);
+        $q = $this->queueFor($workflow, $transition);
         return $q ? [new TransportNamesStamp([$q])] : [];
     }
 
-    /** @return array<string,string> */
+    /** @return array<string, array<string, string>> */
     public function all(): array
     {
-        return $this->transitionToQueueMap;
+        return $this->map;
+    }
+
+    // --- Convenience / BC helpers ------------------------------------------
+
+    /** Accept "workflow.transition" packed route */
+    public function queueForRoute(string $route): ?string
+    {
+        if (str_contains($route, '.')) {
+            [$wf, $tr] = explode('.', $route, 2);
+            return $this->queueFor($wf, $tr);
+        }
+        // Fallback: treat as transition-only (if unique)
+        return $this->queueForTransitionOnly($route);
+    }
+
+    /** Deprecated: transition-only lookup (works only if unique across workflows) */
+    public function queueForTransitionOnly(string $transition): ?string
+    {
+        $tr = QueueNameUtil::normalizeSlug($transition);
+        $found = null;
+        foreach ($this->map as $trs) {
+            if (isset($trs[$tr])) {
+                if ($found !== null) {
+                    // ambiguous across workflows
+                    return null;
+                }
+                $found = $trs[$tr];
+            }
+        }
+        return $found;
     }
 }
