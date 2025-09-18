@@ -79,10 +79,11 @@ final class WorkflowListener
     private function dispatchTransition(WorkflowInterface $workflow, object $subject, string $transition, ?string $atPlace = null): void
     {
         $stamps = [];
+        $workflowName = $workflow->getName();
 
         // add queue stamp automatically if async
-        if ($this->asyncQueueLocator->isAsync($transition)) {
-            $stamps = array_merge($stamps, $this->asyncQueueLocator->stampsFor($transition));
+        if ($isAsync = $this->asyncQueueLocator->isAsync($workflowName, $transition)) {
+            $stamps = array_merge($stamps, $this->asyncQueueLocator->stampsFor($workflowName, $transition));
         }
 
         if (class_exists(TagStamp::class)) {
@@ -100,6 +101,10 @@ final class WorkflowListener
             return;
         }
 
+        if ($isAsync) {
+            $this->entityManager->flush();
+        }
+
         $message = new TransitionMessage(
             $id,
             $subject::class,
@@ -108,10 +113,6 @@ final class WorkflowListener
         );
 
         // If async, flush before queuing so downstream sees persisted state
-        if ($this->asyncQueueLocator->isAsync($transition)) {
-            $this->entityManager->flush();
-        }
-
         $this->messageBus->dispatch($message, $stamps);
     }
 

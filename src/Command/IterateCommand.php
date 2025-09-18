@@ -53,7 +53,6 @@ final class IterateCommand extends Command
         #[Argument('FQCN or short name of the Doctrine entity')] ?string $className = null,
 
         // OPTIONS — description first; name inferred from parameter; explicit shortcut
-        #[Option('Messenger transport name', shortcut: 'p')] ?string $transport = null,
         #[Option('Workflow transition name', shortcut: 't')] ?string $transition = null,
         #[Option('Comma-separated marking(s) to filter', shortcut: 'm')] ?string $marking = null,
         #[Option('Workflow name/code if multiple on class', shortcut: 'w')] ?string $workflowName = null,
@@ -62,15 +61,14 @@ final class IterateCommand extends Command
         #[Option('grid:index after flush?')] ?bool $indexAfterFlush = null,
         #[Option('Show counts per marking and exit', shortcut: 's')] ?bool $stats = null,
         #[Option('force sync (no queues)', shortcut: 'y')] ?bool $sync = null,
-        #[Option('Process at most this many items', shortcut: 'x')] int $max = 0,
-        #[Option('[deprecated] Use --max instead')] int $limit = 0,
+        #[Option('limit the number of records')] int $limit = 0,
         #[Option('Use this count for progress bar', shortcut: 'c')] int $count = 0,
     ): int {
         // --limit shim
-        if ($limit) {
-            $io->warning('--limit is deprecated; use --max.');
-            $max = $limit;
-        }
+//        if ($limit) {
+//            $io->warning('--limit is deprecated; use --max.');
+//            $max = $limit;
+//        }
         if ($sync) {
             $this->asyncQueueLocator->sync = true;
         }
@@ -188,8 +186,8 @@ final class IterateCommand extends Command
 
         if ($workflow && $transition) {
 
-            if ($this->asyncQueueLocator->isAsync($transition)) {
-                $stamps = array_merge($stamps, $this->asyncQueueLocator->stampsFor($transition));
+            if ($this->asyncQueueLocator->isAsync($workflowName, $transition)) {
+                $stamps = array_merge($stamps, $this->asyncQueueLocator->stampsFor($workflowName, $transition));
             }
 ////            $this->bus->dispatch(new TransitionMessage(...), $stamps);
 //
@@ -266,7 +264,7 @@ final class IterateCommand extends Command
                     }
                     $progressBar->advance();
                     $processed++;
-                    if ($max && $processed >= $max) {
+                    if ($limit && $processed >= $limit) {
                         break;
                     }
                     continue;
@@ -277,8 +275,9 @@ final class IterateCommand extends Command
                     $messageStamps[] = new DescriptionStamp("{$shortClass}:{$key} {$marking}->{$transition}");
                 }
 
+                $msg = new TransitionMessage($key, $className, $transition, $workflowName);
                 $this->bus->dispatch(
-                    new TransitionMessage($key, $className, $transition, $workflowName),
+                    $msg,
                     $messageStamps
                 );
             } else {
@@ -293,14 +292,13 @@ final class IterateCommand extends Command
                     action: self::class,
                     context: [
                         'tags' => $tags ? explode(',', $tags) : [],
-                        'transition' => $transition,
-                        'transport' => $transport,
+                        'transition' => $transition
                     ]
                 ));
             }
 
             $processed++;
-            if ($max && $processed >= $max) {
+            if ($limit && ($processed >= $limit)) {
                 break;
             }
 
@@ -325,8 +323,7 @@ final class IterateCommand extends Command
             action: self::class,
             context: [
                 'tags' => $tags ? explode(',', $tags) : [],
-                'transition' => $transition,
-                'transport' => $transport,
+                'transition' => $transition
             ]
         ));
 

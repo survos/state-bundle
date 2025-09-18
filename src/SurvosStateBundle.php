@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Survos\StateBundle;
 
 use Survos\CoreBundle\Traits\HasAssetMapperTrait;
+use Survos\StateBundle\Attribute\Transition;
 use Survos\StateBundle\Command\DumpWorkflowPhpCommand;
 use Survos\StateBundle\Command\DumpWorkflowsYamlCommand;
 use Survos\StateBundle\Command\IterateCommand;
@@ -11,12 +12,14 @@ use Survos\StateBundle\Command\MakeWorkflowCommand;
 use Survos\StateBundle\Command\StateQueuesDumpCommand;
 use Survos\StateBundle\Command\VizCommand;
 use Survos\StateBundle\Compiler\StatePrependExtension;
+use Survos\StateBundle\Doctrine\PostLoadSetEnabledTransitionsListener;
 use Survos\StateBundle\Doctrine\TransitionListener;
 use Survos\StateBundle\Messenger\Middleware\AsyncQueueRoutingMiddleware;
 use Survos\StateBundle\Service\AsyncQueueLocator;
 use Survos\StateBundle\Service\ConfigureFromAttributesService;
 use Survos\StateBundle\Service\PrimaryKeyLocator;
 use Survos\StateBundle\Service\WorkflowHelperService;
+use Survos\StateBundle\Service\WorkflowListener;
 use Survos\StateBundle\Traits\EasyMarkingTrait;
 use Survos\StateBundle\Twig\WorkflowExtension;
 use Symfony\Bundle\FrameworkBundle\Command\WorkflowDumpCommand;
@@ -59,10 +62,6 @@ final class SurvosStateBundle extends AbstractBundle implements CompilerPassInte
         $workflowConfig = $processed['workflows']['workflows'] ?? [];
         $container->setParameter('workflows.configuration', $workflowConfig);
 
-        // set enabled transitions from the database.
-        $container->findDefinition(TransitionListener::class)
-            ->setArgument('$workflowHelperService', new \Symfony\Component\DependencyInjection\Reference(WorkflowHelperService::class))
-            ->setArgument('$workflows', tagged_iterator('workflow'));
 
         $container->findDefinition(WorkflowHelperService::class)
             ->setArgument('$configuration', $workflowConfig);
@@ -100,7 +99,6 @@ final class SurvosStateBundle extends AbstractBundle implements CompilerPassInte
         }
 
         foreach ([AsyncQueueLocator::class,
-                     TransitionListener::class,
                      WorkflowHelperService::class] as $class) {
             $builder->autowire($class)
                 ->setPublic(true)
@@ -134,9 +132,11 @@ final class SurvosStateBundle extends AbstractBundle implements CompilerPassInte
             ->addTag('twig.extension');
 
         $builder->autowire(ConfigureFromAttributesService::class)->setAutoconfigured(true)->setPublic(true);
+//        $builder->autowire(TransitionListener::class)->setAutoconfigured(true)->setPublic(true);
+//        $builder->autowire(PostLoadSetEnabledTransitionsListener::class)->setAutoconfigured(true)->setPublic(true);
 
         // Workflow listener wiring
-        $builder->autowire(\Survos\StateBundle\Service\WorkflowListener::class)
+        $builder->autowire(WorkflowListener::class)
             ->setArgument('$workflowHelperService', new \Symfony\Component\DependencyInjection\Reference(WorkflowHelperService::class))
             ->setArgument('$messageBus', new \Symfony\Component\DependencyInjection\Reference(MessageBusInterface::class))
             ->addTag('kernel.event_listener', ['event' => 'workflow.completed', 'method' => 'onCompleted'])

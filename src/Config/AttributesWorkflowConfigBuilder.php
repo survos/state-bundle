@@ -104,6 +104,9 @@ final class AttributesWorkflowConfigBuilder
 
             /** @var ReflectionClassConstant $const */
             foreach ($rc->getReflectionConstants() as $const) {
+                if (is_array($const->getValue())) {
+                    continue; // e.g. PLACES
+                }
                 $value = (string) $const->getValue();
 
                 // PLACE
