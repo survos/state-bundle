@@ -85,7 +85,8 @@ final class StatePrependExtension
             : QueueNameUtil::normalizePrefix($queuePrefix);
 
         // 4) Build transports: single table, distinct queue_name per workflow+transition
-        $tableName  = 'messenger_workflow_messages';
+        $tableName  = 'messenger_messages';
+//        $tableName  = 'messenger_workflow_messages';
         $transports = [];
         /** @var array<string, array<string, string>> $transitionToQueueMap */
         $transitionToQueueMap = [];
