@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Survos\StateBundle\Service;
 
 use App\Workflow\AssetFlow;
+use Survos\StateBundle\Message\TransitionMessage;
 use Survos\StateBundle\Util\QueueNameUtil;
 use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 use Zenstruck\Messenger\Monitor\Stamp\DescriptionStamp;
@@ -54,6 +55,11 @@ final class AsyncQueueLocator
 
         return $stamps;
 
+    }
+
+    public function stamps(TransitionMessage $message): array
+    {
+        return $this->stampsFor($message->getWorkflow(), $message->getTransitionName(), $message->getId());
     }
 
     /** @return array<string, array<string, string>> */
