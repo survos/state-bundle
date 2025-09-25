@@ -36,11 +36,11 @@ final class WorkflowListener
     #[AsEnteredListener]
     public function onEntered(EnteredEvent $event): void
     {
+
         $subject  = $event->getSubject();
         $workflow = $this->workflowHelperService->getWorkflow($subject, $event->getWorkflowName());
 
         $currentPlace = array_keys($workflow->getMarking($subject)->getPlaces())[0] ?? null;
-        $meta = $this->workflowHelperService->getPlaceMetadata($currentPlace, $workflow);
         if (!$currentPlace) {
             return;
         }
@@ -56,7 +56,7 @@ final class WorkflowListener
         }
     }
 
-    #[AsCompletedListener]
+    #[AsCompletedListener(priority: -50)]
     public function onCompleted(CompletedEvent $event): void
     {
         $subject   = $event->getSubject();
@@ -82,9 +82,9 @@ final class WorkflowListener
         $workflowName = $workflow->getName();
 
         // add queue stamp automatically if async
-        if ($isAsync = $this->asyncQueueLocator->isAsync($workflowName, $transition)) {
+//        if ($isAsync = $this->asyncQueueLocator->isAsync($workflowName, $transition)) {
             $stamps = array_merge($stamps, $this->asyncQueueLocator->stampsFor($workflowName, $transition));
-        }
+//        }
 
         if (class_exists(TagStamp::class)) {
             $stamps[] = new TagStamp($transition);
@@ -101,9 +101,9 @@ final class WorkflowListener
             return;
         }
 
-        if ($isAsync) {
+//        if ($this->asyncQueueLocator->isAsync($workflowName, $transition)) {
             $this->entityManager->flush();
-        }
+//        }
 
         $message = new TransitionMessage(
             $id,

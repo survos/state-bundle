@@ -5,6 +5,7 @@ namespace Survos\StateBundle\Controller;
 use Doctrine\ORM\EntityManagerInterface;
 use Survos\CoreBundle\Traits\QueryBuilderHelperInterface;
 use Survos\StateBundle\Service\WorkflowHelperService;
+use Survos\StateBundle\Service\WorkflowStatsService;
 use Survos\StateBundle\Traits\MarkingInterface;
 use Symfony\Bridge\Twig\Attribute\Template;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

@@ -1,0 +1,62 @@
+{% extends 'base.html.twig' %}
+{% block title %}Workflow Dashboard{% endblock %}
+
+{% block body %}
+  <div class="container" style="max-width: 1200px;">
+    <h1>Workflow Dashboard</h1>
+    <p>Total across all workflow entities: <strong>{{ grandTotal|number_format(0) }}</strong></p>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;">
+      {% for chart in charts %}
+        <div class="card" style="padding:16px;border:1px solid #ddd;border-radius:12px;">
+          <h3 style="margin:0 0 8px 0;">{{ chart.class|u.split('\\')|last }} <small style="color:#666;">({{ chart.total }})</small></h3>
+          <canvas id="pie_{{ loop.index }}"></canvas>
+          {% if chart.labels|length %}
+            <table style="width:100%;margin-top:12px;border-collapse:collapse;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;border-bottom:1px solid #eee;">Marking</th>
+                  <th style="text-align:right;border-bottom:1px solid #eee;">Count</th>
+                </tr>
+              </thead>
+              <tbody>
+              {% for i in 0..chart.labels|length-1 %}
+                <tr>
+                  <td style="padding:4px 0;">{{ chart.labels[i] is not empty ? chart.labels[i] : '(empty)' }}</td>
+                  <td style="text-align:right;">{{ chart.values[i] }}</td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <p style="color:#666;margin-top:12px;">No data.</p>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script>
+    (function () {
+      {% for chart in charts %}
+      (function() {
+        const ctx = document.getElementById('pie_{{ loop.index }}').getContext('2d');
+        const labels = {{ chart.labels|json_encode|raw }};
+        const values = {{ chart.values|json_encode|raw }};
+        // Let Chart.js pick default colors; no styling to keep it portable.
+        new Chart(ctx, {
+          type: 'pie',
+          data: { labels: labels, datasets: [{ data: values }] },
+          options: {
+            plugins: {
+              legend: { position: 'bottom' },
+              title: { display: false }
+            }
+          }
+        });
+      })();
+      {% endfor %}
+    })();
+  </script>
+{% endblock %}

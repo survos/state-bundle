@@ -11,16 +11,22 @@ use Survos\StateBundle\Command\IterateCommand;
 use Survos\StateBundle\Command\MakeWorkflowCommand;
 use Survos\StateBundle\Command\StateQueuesDumpCommand;
 use Survos\StateBundle\Command\VizCommand;
+use Survos\StateBundle\Compiler\RegisterWorkflowEntitiesPass;
 use Survos\StateBundle\Compiler\StatePrependExtension;
+use Survos\StateBundle\Controller\WorkflowController;
+use Survos\StateBundle\Controller\WorkflowDashboardController;
 use Survos\StateBundle\Doctrine\PostLoadSetEnabledTransitionsListener;
 use Survos\StateBundle\Doctrine\TransitionListener;
 use Survos\StateBundle\Messenger\Middleware\AsyncQueueRoutingMiddleware;
 use Survos\StateBundle\Service\AsyncQueueLocator;
 use Survos\StateBundle\Service\ConfigureFromAttributesService;
+use Survos\StateBundle\Service\EntityInterfaceDetector;
 use Survos\StateBundle\Service\PrimaryKeyLocator;
 use Survos\StateBundle\Service\WorkflowHelperService;
 use Survos\StateBundle\Service\WorkflowListener;
+use Survos\StateBundle\Service\WorkflowStatsService;
 use Survos\StateBundle\Traits\EasyMarkingTrait;
+use Survos\StateBundle\Traits\MarkingInterface;
 use Survos\StateBundle\Twig\WorkflowExtension;
 use Symfony\Bundle\FrameworkBundle\Command\WorkflowDumpCommand;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
@@ -49,10 +55,22 @@ final class SurvosStateBundle extends AbstractBundle implements CompilerPassInte
     {
         parent::build($container);
         $container->addCompilerPass($this);
+//        $container->addCompilerPass(new RegisterWorkflowEntitiesPass());
     }
 
     public function process(ContainerBuilder $container): void
     {
+
+        // Find all services that implement the interface
+//        foreach ($container->getDefinitions() as $id => $definition) {
+//            $class = $definition->getClass();
+//            if ($class && is_subclass_of($class, MarkingInterface::class)) {
+//                dump($class, $definition);
+//                $definition->addTag('state.marking_interface');
+//                break;
+//            }
+//        }
+
         // Pull the fully-processed Framework configuration
         $frameworkExt = $container->getExtension('framework');
         $rawFramework = $container->getExtensionConfig('framework');
@@ -99,11 +117,23 @@ final class SurvosStateBundle extends AbstractBundle implements CompilerPassInte
         }
 
         foreach ([AsyncQueueLocator::class,
+                     WorkflowStatsService::class,
+                     EntityInterfaceDetector::class,
                      WorkflowHelperService::class] as $class) {
             $builder->autowire($class)
                 ->setPublic(true)
                 ->setAutowired(true)
                 ->setAutoconfigured(true);
+        }
+
+        foreach ([
+            WorkflowController::class,
+            WorkflowDashboardController::class] as $class) {
+            $builder->autowire($class)
+                ->setPublic(true)
+                ->setAutowired(true)
+                ->setAutoconfigured(true)
+                ->addTag('controller.service_arguments');
         }
 
         foreach ([IterateCommand::class,

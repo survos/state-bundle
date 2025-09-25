@@ -15,6 +15,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\DependencyInjection\Attribute\When;
 use Symfony\Component\DependencyInjection\Attribute\WhenNot;
+use Symfony\Component\Workflow\Event\Event;
 use Twig\Environment;
 use Survos\StateBundle\Attribute\Transition;
 use Survos\StateBundle\Attribute\Workflow;
@@ -24,7 +25,7 @@ use Symfony\Component\Workflow\Event\GuardEvent;
 use Symfony\Component\Workflow\Event\TransitionEvent;
 use function Symfony\Component\String\u;
 
-#[AsCommand('survos:workflow:generate', 'IS THIS RIGHT?  Generate src/Workflow/(class)Workflow and Interface using nette/php-generator')]
+#[AsCommand('survos:state:generate', 'Generate src/Workflow/(class)Workflow using nette/php-generator')]
 #[WhenNot('prod')]
 final class MakeWorkflowCommand extends Command
 {
@@ -40,10 +41,11 @@ final class MakeWorkflowCommand extends Command
 
     public function __invoke(
         SymfonyStyle                                                                                             $io,
-        #[Argument(name: 'class-name', description: 'entity class name')] string                       $entityClassName,
-        #[Argument(name: 'place-names', description: 'place names, e.g. new,loaded,processed')] string $placeNames = 'new,loaded',
-        #[Argument(name: 'transition-names', description: 'transitions, e.g. load,process')] string    $transitionNames = 'load',
-        #[Option(description: 'namespace')] string                                                     $ns = "App\\Workflow"
+        #[Argument('entity class name')] string                       $entityClassName,
+        #[Argument('place names, e.g. new,loaded,processed')] string $placeNames = 'new,loaded',
+        #[Argument('transitions, e.g. load,process')] string    $transitionNames = 'load',
+        #[Option(description: 'namespace')] string                                                     $ns = "App\\Workflow",
+        #[Option("don't write the files")] ?bool $dry=null
     )
     {
         // @todo: check that class must implement MarkingInterface
@@ -70,7 +72,7 @@ final class MakeWorkflowCommand extends Command
             $namespace->addUse($use);
         }
 
-        $interfaceClass = 'I' . $shortName . "Workflow";
+        $interfaceClass = $shortName . "WFDefinition";
         $class = $namespace->addInterface($interfaceClass);
         $namespace->add($class);
         $class->addConstant('WORKFLOW_NAME', $workflowClass);
@@ -90,7 +92,7 @@ final class MakeWorkflowCommand extends Command
             $transitionConstants[] = 'self::' . $constant->getName();
         }
         // hack, see https://github.com/nette/php-generator/issues/173
-        $this->writeFile($namespace, $interfaceClass);
+        $this->writeFile($namespace, $interfaceClass, $dry);
 
         $fullInterfaceClass = $ns . "\\" . $interfaceClass;
         if (!interface_exists($fullInterfaceClass)) {
@@ -100,9 +102,9 @@ final class MakeWorkflowCommand extends Command
 
         // now the workflow events
         $namespace = new PhpNamespace($ns);
+//        $fullInterfaceClass,
         foreach (
             [
-                $fullInterfaceClass,
                 $entityClassName,
 //            $ns . "\\" . $interfaceClass, //  because they're in the same namespace, this isn't required
                 Workflow::class,
@@ -114,6 +116,7 @@ final class MakeWorkflowCommand extends Command
         ) {
             $namespace->addUse($use);
         }
+        $namespace->addUse($fullInterfaceClass, 'WF');
 //        dd($namespace->getUses(), $fullInterfaceClass);
 
         // This name is used for injecting the workflow into a service
@@ -123,7 +126,7 @@ final class MakeWorkflowCommand extends Command
 
 // create new classes in the namespace
         $class = $namespace->addClass($workflowClass);
-        $class->addImplement($fullInterfaceClass);
+//        $class->addImplement($fullInterfaceClass);
         $class->addAttribute(Workflow::class, [
             'supports' => [new Literal($shortName . '::class')],
             'name' => new Literal('self::WORKFLOW_NAME')]);
@@ -137,7 +140,7 @@ final class MakeWorkflowCommand extends Command
         $parameter = $method
             ->addParameter('event');
         $parameter
-            ->setType(Type::union(TransitionEvent::class, GuardEvent::class));
+            ->setType(Event::class);
 
         $method->setBody(sprintf(<<<'PHP'
 		/** @var %s */ return $event->getSubject();
@@ -168,7 +171,7 @@ PHP, $shortName));
             $method = $class->addMethod($name)
                 ->setReturnType('void')
                 ->addAttribute(AsTransitionListener::class, [
-                    new Literal('self::WORKFLOW_NAME'),
+                    new Literal('WF::WORKFLOW_NAME'),
                     new Literal($transitionConstant)
                 ]);
             $method
@@ -179,19 +182,23 @@ PHP, $shortName));
 //            dd((string)$method);
         }
 
-        $this->writeFile($namespace, $workflowClass);
+        $this->writeFile($namespace, $workflowClass, $dry);
 
 
         return self::SUCCESS;
     }
 
-    private function writeFile(PhpNamespace $namespace, string $className)
+    private function writeFile(PhpNamespace $namespace, string $className, bool $dry=false)
     {
         $fn = $this->dir . "/$className.php";
 
         $code = "<?php\n\n" . $namespace;
 //        $code = preg_replace('/\'(self.*?)\'/', "$1", $code);
 
-        file_put_contents($fn, $code);
+        if ($dry) {
+            echo $code;
+        } else {
+            file_put_contents($fn, $code);
+        }
     }
 }

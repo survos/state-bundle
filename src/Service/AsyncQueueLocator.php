@@ -3,8 +3,11 @@ declare(strict_types=1);
 
 namespace Survos\StateBundle\Service;
 
+use App\Workflow\AssetFlow;
 use Survos\StateBundle\Util\QueueNameUtil;
 use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
+use Zenstruck\Messenger\Monitor\Stamp\DescriptionStamp;
+use Zenstruck\Messenger\Monitor\Stamp\TagStamp;
 
 final class AsyncQueueLocator
 {
@@ -33,10 +36,24 @@ final class AsyncQueueLocator
     }
 
     /** @return TransportNamesStamp[] */
-    public function stampsFor(string $workflow, string $transition): array
+    public function stampsFor(string $workflow, string $transition, ?string $id=null): array
     {
+        if ($this->sync) {
+            return [new TransportNamesStamp(['sync'])];
+        }
+
         $q = $this->queueFor($workflow, $transition);
-        return $q ? [new TransportNamesStamp([$q])] : [];
+        $stamps =  $q ? [new TransportNamesStamp([$q])] : [];
+
+        if (class_exists(TagStamp::class)) {
+            $stamps[] = new DescriptionStamp($transition);
+        }
+        if ($id && class_exists(DescriptionStamp::class)) {
+            $stamps[] = new DescriptionStamp("$workflow $id");
+        }
+
+        return $stamps;
+
     }
 
     /** @return array<string, array<string, string>> */
