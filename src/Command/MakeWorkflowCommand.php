@@ -188,7 +188,7 @@ PHP, $shortName));
         return self::SUCCESS;
     }
 
-    private function writeFile(PhpNamespace $namespace, string $className, bool $dry=false)
+    private function writeFile(PhpNamespace $namespace, string $className, ?bool $dry=false)
     {
         $fn = $this->dir . "/$className.php";
 
