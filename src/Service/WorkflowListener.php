@@ -81,36 +81,27 @@ final class WorkflowListener
         $stamps = [];
         $workflowName = $workflow->getName();
 
-        // add queue stamp automatically if async
-//        if ($isAsync = $this->asyncQueueLocator->isAsync($workflowName, $transition)) {
-            $stamps = array_merge($stamps, $this->asyncQueueLocator->stampsFor($workflowName, $transition));
-//        }
-
-        if (class_exists(TagStamp::class)) {
-            $stamps[] = new TagStamp($transition);
-        }
-        if (class_exists(DescriptionStamp::class)) {
-            $short = (new \ReflectionClass($subject))->getShortName();
-            $id    = $this->resolveId($subject);
-            $stamps[] = new DescriptionStamp(sprintf('Next/%s-%s @%s: %s', $short, (string)$id, (string)$atPlace, $transition));
-        }
-
-        $id = $this->resolveId($subject);
-        if ($id === null) {
+        // this seems expensive?
+        if (!$id = $this->resolveId($subject)) {
             $this->logger->warning('WorkflowListener: cannot resolve id for subject', ['class' => $subject::class]);
             return;
         }
-
-//        if ($this->asyncQueueLocator->isAsync($workflowName, $transition)) {
-            $this->entityManager->flush();
-//        }
-
         $message = new TransitionMessage(
             $id,
             $subject::class,
             $transition,
             $workflow->getName()
         );
+        $stamps = $this->asyncQueueLocator->stamps($message);
+
+//        if (class_exists(DescriptionStamp::class)) {
+//            $short = (new \ReflectionClass($subject))->getShortName();
+//            $stamps[] = new DescriptionStamp(sprintf('Next/%s-%s @%s: %s', $short, (string)$id, (string)$atPlace, $transition));
+//        }
+
+//        if ($this->asyncQueueLocator->isAsync($workflowName, $transition)) {
+            $this->entityManager->flush();
+//        }
 
         // If async, flush before queuing so downstream sees persisted state
         $this->messageBus->dispatch($message, $stamps);

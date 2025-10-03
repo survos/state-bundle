@@ -366,6 +366,7 @@ ORDER BY n.nspname, c.relname;");
     public function handleTransition(TransitionMessage $message)
     {
         if (!$object = $this->entityManager->find($message->getClassName(), $message->getId())) {
+            $this->logger->error("Missing $message->id in $message->className");
             $debugMessage = sprintf("missing entity %s for %s", $message->getClassName(), $message->getId());
             return ['message' => $debugMessage];
         }
@@ -400,13 +401,14 @@ ORDER BY n.nspname, c.relname;");
             ];
         }
 
-        return [
+        $response = [
             'message' => "applied $transition to $shortName::$id ($initialMarking)",
             //     'details' => json_encode((array)$message),
             'initialMarking' => $initialMarking,
             'marking' => $marking,
             'class' => $object,
         ];
+        return $response;
 
     }
 

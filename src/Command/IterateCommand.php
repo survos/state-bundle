@@ -3,6 +3,7 @@
 namespace Survos\StateBundle\Command;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Survos\CoreBundle\Traits\QueryBuilderHelperInterface;
@@ -59,6 +60,7 @@ final class IterateCommand extends Command
         #[Option('Comma-separated tags for listeners', shortcut: 'g')] string $tags = '',
         #[Option('Comma-separated property paths to dump for each row', shortcut: 'd')] string $dump = '',
         #[Option('grid:index after flush?')] ?bool $indexAfterFlush = null,
+        #[Option('filter using urlQuerystring style')] string $filter='',
         #[Option('Show counts per marking and exit', shortcut: 's')] ?bool $stats = null,
         #[Option('force sync (no queues)', shortcut: 'y')] ?bool $sync = null,
         #[Option('limit the number of records')] int $limit = 0,
@@ -72,6 +74,9 @@ final class IterateCommand extends Command
         if ($sync) {
             $this->asyncQueueLocator->sync = true;
         }
+
+        $filters = $this->parseFilters($filter);
+
 
         // Resolve/select entity class
         $doctrineEntitiesFqcn = $this->getAllDoctrineEntitiesFqcn();
@@ -101,6 +106,11 @@ final class IterateCommand extends Command
 
         /** @var QueryBuilderHelperInterface $repo */
         $repo = $this->entityManager->getRepository($className);
+        $qb = $this->entityManager->createQueryBuilder()
+            ->select('e')
+            ->from($className, 'e');
+//        $this->applyFilters($qb, $filters);
+//        $count = $this->getCount($qb);
 
         // Determine workflow (if any) for this class
         $workflow = null;
@@ -164,7 +174,7 @@ final class IterateCommand extends Command
         $io->title($className);
 
         // Build where (supports IN() for multiple markings)
-        $where = [];
+        $where = $filters;
         if ($marking) {
             $where['marking'] = array_values(array_filter(array_map('trim', explode(',', $marking))));
         }
@@ -186,9 +196,6 @@ final class IterateCommand extends Command
 
         if ($workflow && $transition) {
 
-            if ($this->asyncQueueLocator->isAsync($workflowName, $transition)) {
-                $stamps = array_merge($stamps, $this->asyncQueueLocator->stampsFor($workflowName, $transition));
-            }
 ////            $this->bus->dispatch(new TransitionMessage(...), $stamps);
 //
 //            $wfMeta = $this->workflowHelperService->getTransitionMetadata($transition, $workflow);
@@ -215,12 +222,12 @@ final class IterateCommand extends Command
         }
 
         // Build query
-        $qb = $this->entityManager->getRepository($className)->createQueryBuilder('t');
+//        $qb = $this->entityManager->getRepository($className)->createQueryBuilder('t');
         foreach ($where as $key => $value) {
             if (is_array($value)) {
-                $qb->andWhere("t.$key IN (:{$key})");
+                $qb->andWhere("e.$key IN (:{$key})");
             } else {
-                $qb->andWhere("t.$key = :{$key}");
+                $qb->andWhere("e.$key = :{$key}");
             }
             $qb->setParameter($key, $value);
         }
@@ -243,6 +250,7 @@ final class IterateCommand extends Command
 
         // Iterate
         $processed = 0;
+
         foreach ($qb->getQuery()->toIterable() as $item) {
             $key = $this->propertyAccessor->getValue($item, $identifier);
 
@@ -270,15 +278,20 @@ final class IterateCommand extends Command
                     continue;
                 }
 
-                $messageStamps = $stamps;
-                if (class_exists(DescriptionStamp::class)) {
-                    $messageStamps[] = new DescriptionStamp("{$shortClass}:{$key} {$marking}->{$transition}");
-                }
+//                $messageStamps = $stamps;
+//                if (class_exists(DescriptionStamp::class)) {
+//                    $messageStamps[] = new DescriptionStamp("{$shortClass}:{$key} {$marking}->{$transition}");
+//                }
+
+//                if ($this->asyncQueueLocator->isAsync($workflowName, $transition)) {
+//                    $stamps = array_merge($stamps, $this->asyncQueueLocator->stampsFor($workflowName, $transition));
+//                }
 
                 $msg = new TransitionMessage($key, $className, $transition, $workflowName);
+                $stamps = $this->asyncQueueLocator->stamps($msg);
                 $this->bus->dispatch(
                     $msg,
-                    $messageStamps
+                    $stamps
                 );
             } else {
                 // No workflow: emit a row event and let listeners handle it
@@ -328,7 +341,7 @@ final class IterateCommand extends Command
         ));
 
         // Optional stats if a workflow was in play
-        if ($workflow) {
+        if ($workflow && $stats) {
             $this->showStats($io, $className, $availableTransitions, $workflow);
         }
 
@@ -401,5 +414,60 @@ final class IterateCommand extends Command
         }
 
         $table->render();
+    }
+
+    private function parseFilters(?string $filterString): array
+    {
+        if (!$filterString) {
+            return [];
+        }
+
+        parse_str($filterString, $filters);
+        return $filters;
+    }
+
+    private function applyFilters($qb, array $filters): void
+    {
+        foreach ($filters as $field => $value) {
+            // Handle different operators
+            if (str_contains($value, ',')) {
+                // IN operator: gender=male,female
+                $values = explode(',', $value);
+                $qb->andWhere("e.$field IN (:$field)")
+                    ->setParameter($field, $values);
+            } elseif (str_starts_with($value, '%') || str_ends_with($value, '%')) {
+                // LIKE operator: name=%Bob%
+                $qb->andWhere("e.$field LIKE :$field")
+                    ->setParameter($field, $value);
+            } elseif ($value === 'null') {
+                // IS NULL: field=null
+                $qb->andWhere("e.$field IS NULL");
+            } elseif ($value === '!null') {
+                // IS NOT NULL: field=!null
+                $qb->andWhere("e.$field IS NOT NULL");
+            } else {
+                // Exact match
+                $qb->andWhere("e.$field = :$field")
+                    ->setParameter($field, $value);
+            }
+        }
+    }
+
+    private function getCount(QueryBuilder $qb): int
+    {
+        // Clone to avoid modifying the original
+        $countQb = clone $qb;
+
+        // Reset select and get count
+        $countQb->select('COUNT(e.id)');
+
+        // Remove ordering (not needed for count and can slow it down)
+        $countQb->resetDQLPart('orderBy');
+
+        // Remove limit/offset for accurate total count
+        $countQb->setFirstResult(null);
+        $countQb->setMaxResults(null);
+
+        return (int) $countQb->getQuery()->getSingleScalarResult();
     }
 }

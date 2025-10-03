@@ -65,17 +65,30 @@ final class StatePrependExtension
         foreach ($builder->getExtensionConfig('framework') as $fw) {
             $wf = $fw['workflows']['workflows'] ?? [];
             foreach ($wf as $wfName => $def) {
+                // this doesn't feel like the right place!
+                foreach ($def['places'] as $placeName => $placeData) {
+                    if ($next = $placeData['metadata']['next']??false) {
+                        $initialTransitions[$placeName] = $next;
+                    }
+                }
                 foreach (($def['transitions'] ?? []) as $t) {
                     $tName = $t['name'] ?? null;
                     if ($tName && (($t['metadata']['async'] ?? false) === true)) {
                         $asyncByWorkflow[$wfName][$tName] = true;
                     }
+                    // override the transport name?
+                    if ($tName && (($transport = $t['metadata']['transport'] ?? false) === true)) {
+                        $asyncByWorkflow[$wfName][$tName] = $transport;
+                    }
+
                 }
             }
         }
 
+        $builder->setParameter('survos_state.place_transitions', $initialTransitions);
+        $builder->setParameter('survos_state.async_transition_map', []);
+
         if (!$asyncByWorkflow) {
-            $builder->setParameter('survos_state.async_transition_map', []);
             return;
         }
 
@@ -117,6 +130,7 @@ final class StatePrependExtension
                 ],
             ]);
         }
+//        dd($transitionToQueueMap, $initialTransitions);
 
         // Publish the workflow→transition→queue map for AsyncQueueLocator
         $builder->setParameter('survos_state.async_transition_map', $transitionToQueueMap);

@@ -10,6 +10,7 @@ use Survos\StateBundle\Command\DumpWorkflowsYamlCommand;
 use Survos\StateBundle\Command\IterateCommand;
 use Survos\StateBundle\Command\MakeWorkflowCommand;
 use Survos\StateBundle\Command\StateQueuesDumpCommand;
+use Survos\StateBundle\Command\StateStatsCommand;
 use Survos\StateBundle\Command\VizCommand;
 use Survos\StateBundle\Compiler\RegisterWorkflowEntitiesPass;
 use Survos\StateBundle\Compiler\StatePrependExtension;
@@ -18,8 +19,12 @@ use Survos\StateBundle\Controller\WorkflowDashboardController;
 use Survos\StateBundle\Doctrine\PostLoadSetEnabledTransitionsListener;
 use Survos\StateBundle\Doctrine\TransitionListener;
 use Survos\StateBundle\Messenger\Middleware\AsyncQueueRoutingMiddleware;
+use Survos\StateBundle\Messenger\Middleware\ContextStampingMiddleware;
+use Survos\StateBundle\Messenger\Subscriber\ContextFilterSubscriber;
+use Survos\StateBundle\Messenger\Subscriber\LogMessageFailureListener;
 use Survos\StateBundle\Service\AsyncQueueLocator;
 use Survos\StateBundle\Service\ConfigureFromAttributesService;
+use Survos\StateBundle\Service\ConsoleEventListener;
 use Survos\StateBundle\Service\EntityInterfaceDetector;
 use Survos\StateBundle\Service\PrimaryKeyLocator;
 use Survos\StateBundle\Service\WorkflowHelperService;
@@ -37,6 +42,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
+use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Component\Messenger\MessageBusInterface;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_locator;
@@ -92,6 +99,7 @@ final class SurvosStateBundle extends AbstractBundle implements CompilerPassInte
             && $container->hasDefinition(AsyncQueueLocator::class)) {
             $def = $container->findDefinition(AsyncQueueLocator::class);
             $def->setArgument('$map', $container->getParameter('survos_state.async_transition_map'));
+            $def->setArgument('$placeTransitions', $container->getParameter('survos_state.place_transitions'));
         }
     }
 
@@ -115,6 +123,8 @@ final class SurvosStateBundle extends AbstractBundle implements CompilerPassInte
                 ],
             ]);
         }
+
+
 
         foreach ([AsyncQueueLocator::class,
                      WorkflowStatsService::class,
@@ -148,6 +158,38 @@ final class SurvosStateBundle extends AbstractBundle implements CompilerPassInte
             }
         }
 
+
+        $services = $container->services();
+        // NOT best practice for bundles.
+        $services
+            ->defaults()
+            ->autowire()
+            ->autoconfigure();
+
+
+        // middleware
+        $services->set(ContextStampingMiddleware::class)
+            ->tag('messenger.middleware');
+
+        // explicit failure listener (you already had this)
+        $services->set(LogMessageFailureListener::class)
+            ->tag('kernel.event_listener', [
+                'event'    => WorkerMessageFailedEvent::class,
+                'method'   => '__invoke',
+                'priority' => 0,
+            ]);
+
+        // explicit receive-time filter listener
+        $services->set(ContextFilterSubscriber::class)
+//            ->arg('$filterEnvName', '%env(default:CONTEXT_STAMP:STATE_FILTER_ENV)%');
+            ->arg('$filterEnvName', 'CONTEXT_STAMP') // default; STATE_FILTER_ENV can override at runtime
+            ->tag('kernel.event_listener', [
+                'event'    => WorkerMessageReceivedEvent::class,
+                'method'   => '__invoke',
+                'priority' => 1000,
+            ]);
+
+
         $builder->setParameter('survos_workflow.base_layout', $config['base_layout'] ?? 'base.html.twig');
 
         // Optional: expose Symfony Workflow dump/viz via tagged locator (if the commands are present)
@@ -156,12 +198,19 @@ final class SurvosStateBundle extends AbstractBundle implements CompilerPassInte
                 ->set('console.command.survos_workflow_dump', WorkflowDumpCommand::class)
                 ->args([tagged_locator('workflow', 'name')]);
         }
+        $builder->autowire(StateStatsCommand::class)
+            ->setPublic(true)
+            ->setAutowired(true)
+//            ->setArgument('$filterEnvName', '%env(default:CONTEXT_STAMP:STATE_FILTER_ENV)%')
+            ->addTag('console.command')
+            ->setAutoconfigured(true);
+
 
         $builder->autowire(WorkflowExtension::class)
             ->addArgument(new \Symfony\Component\DependencyInjection\Reference(WorkflowHelperService::class))
             ->addTag('twig.extension');
 
-        $builder->autowire(ConfigureFromAttributesService::class)->setAutoconfigured(true)->setPublic(true);
+//        $builder->autowire(ConfigureFromAttributesService::class)->setAutoconfigured(true)->setPublic(true);
 //        $builder->autowire(TransitionListener::class)->setAutoconfigured(true)->setPublic(true);
 //        $builder->autowire(PostLoadSetEnabledTransitionsListener::class)->setAutoconfigured(true)->setPublic(true);
 
@@ -171,6 +220,17 @@ final class SurvosStateBundle extends AbstractBundle implements CompilerPassInte
             ->setArgument('$messageBus', new \Symfony\Component\DependencyInjection\Reference(MessageBusInterface::class))
             ->addTag('kernel.event_listener', ['event' => 'workflow.completed', 'method' => 'onCompleted'])
             ->addTag('kernel.event_listener', ['event' => 'workflow.entered', 'method' => 'onEntered']);
+
+        $builder->autowire(ConsoleEventListener::class)
+            ->setAutoconfigured(true)
+            ->setAutoconfigured(true)
+            ->setPublic(true)
+            ->setArgument('$workflowHelperService', new Reference(WorkflowHelperService::class))
+            ->setArgument('$messageBus', new Reference(MessageBusInterface::class))
+//            ->addTag('console.event_listener', ['event' => 'workflow.completed', 'method' => 'onCompleted'])
+//            ->addTag('kernel.event_listener', ['event' => 'workflow.entered', 'method' => 'onEntered'])
+        ;
+
 
         $builder->setParameter('survos_state.entity_paths', $config['workflow_paths'] ?? ['%kernel.project_dir%/src/Workflow']);
     }

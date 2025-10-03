@@ -3,8 +3,10 @@ declare(strict_types=1);
 
 namespace Survos\StateBundle\Service;
 
-use App\Workflow\AssetFlow;
+use Doctrine\ORM\EntityManagerInterface;
 use Survos\StateBundle\Message\TransitionMessage;
+use Survos\StateBundle\Messenger\Contract\ContextStampProviderInterface;
+use Survos\StateBundle\Messenger\Stamp\ContextStamp;
 use Survos\StateBundle\Util\QueueNameUtil;
 use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 use Zenstruck\Messenger\Monitor\Stamp\DescriptionStamp;
@@ -17,10 +19,18 @@ final class AsyncQueueLocator
     /**
      * @param array<string, array<string, string>> $map  e.g. ['media' => ['download' => 'media.download']]
      */
-    public function __construct(private readonly array $map) {}
+    public function __construct(
+        private readonly array $map,
+        private readonly array $placeTransitions,
+        private readonly EntityManagerInterface $entityManager,
+    ) {}
 
     // --- Primary (workflow-aware) API ---------------------------------------
 
+    public function getPlaceTransitions(string $workflow, string $placename): array
+    {
+        return $this->placeTransitions[$workflow][$placename] ?? [];
+    }
     public function isAsync(string $workflow, string $transition): bool
     {
         if ($this->sync) {
@@ -39,27 +49,39 @@ final class AsyncQueueLocator
     /** @return TransportNamesStamp[] */
     public function stampsFor(string $workflow, string $transition, ?string $id=null): array
     {
-        if ($this->sync) {
-            return [new TransportNamesStamp(['sync'])];
-        }
-
-        $q = $this->queueFor($workflow, $transition);
-        $stamps =  $q ? [new TransportNamesStamp([$q])] : [];
-
-        if (class_exists(TagStamp::class)) {
-            $stamps[] = new DescriptionStamp($transition);
-        }
-        if ($id && class_exists(DescriptionStamp::class)) {
-            $stamps[] = new DescriptionStamp("$workflow $id");
-        }
-
-        return $stamps;
-
+        assert(false, "use ->stamps(msg)");
     }
 
     public function stamps(TransitionMessage $message): array
     {
-        return $this->stampsFor($message->getWorkflow(), $message->getTransitionName(), $message->getId());
+        if ($this->sync) {
+            $stamps = [new TransportNamesStamp(['sync'])];
+        } else {
+            $q = $this->queueFor($message->workflow, $message->transitionName);
+            $stamps =  $q ? [new TransportNamesStamp([$q])] : [];
+        }
+
+//        if (class_exists(DescriptionStamp::class)) {
+//            $stamps[] = new DescriptionStamp($message->transitionName);
+//        }
+//        if ($message->id && class_exists(DescriptionStamp::class)) {
+//            $shortClass = new \ReflectionClass($message->className);
+//            $stamps[] = new DescriptionStamp("{$shortClass}:{$message->id} {$message->transitionName}");
+//        }
+
+        if (is_a($className=$message->className, ContextStampProviderInterface::class, true)) {
+            if ($entity = $this->entityManager->find($className, $message->id)) {
+                $contextStamp = $entity->getContextStamp();
+            }
+            if (is_array($contextStamp)) {
+                foreach ($contextStamp as $key => $val) {
+                    $stamps[] = new ContextStamp($val, (string)$key);
+                }
+            } else {
+                $stamps[] = new ContextStamp($contextStamp);
+            }
+        }
+        return $stamps;
     }
 
     /** @return array<string, array<string, string>> */
