@@ -15,6 +15,7 @@ use Zenstruck\Messenger\Monitor\Stamp\TagStamp;
 final class AsyncQueueLocator
 {
     public bool $sync = false;
+    public ?string $transport=null; // force override
 
     /**
      * @param array<string, array<string, string>> $map  e.g. ['media' => ['download' => 'media.download']]
@@ -42,6 +43,12 @@ final class AsyncQueueLocator
 
     public function queueFor(string $workflow, string $transition): ?string
     {
+        if ($this->sync) {
+            return null;
+        }
+        if ($this->transport) {
+            return $this->transport;
+        }
         [$wf, $tr] = QueueNameUtil::normalizePair($workflow, $transition);
         return $this->map[$wf][$tr] ?? null;
     }

@@ -88,36 +88,6 @@ final class StatePrependExtension
         $builder->setParameter('survos_state.place_transitions', $initialTransitions);
         $builder->setParameter('survos_state.async_transition_map', []);
 
-        // 2b) Fallback: ensure MuseumObjectWorkflow has at least one transition
-        //     (prevents Framework validation from aborting before passes)
-        $museumHasTransitions = false;
-        foreach ($builder->getExtensionConfig('framework') as $fw) {
-            $wf = $fw['workflows']['workflows'] ?? [];
-            if (isset($wf['MuseumObjectWorkflow']['transitions']) && !empty($wf['MuseumObjectWorkflow']['transitions'])) {
-                $museumHasTransitions = true;
-                break;
-            }
-        }
-        if (!$museumHasTransitions) {
-            $builder->prependExtensionConfig('framework', [
-                'workflows' => [
-                    'workflows' => [
-                        'MuseumObjectWorkflow' => [
-                            'type' => 'state_machine',
-                            'marking_store' => ['type' => 'single_state', 'property' => 'marking'],
-                            'supports' => ['App\Entity\MuseumObject'],
-                            'places' => ['draft'],
-                            // Identity transition keeps validation happy; your later logic can extend/replace.
-                            'transitions' => [
-                                'bootstrap' => ['from' => 'draft', 'to' => 'draft'],
-                            ],
-                        ],
-                    ],
-                ],
-            ]);
-        }
-
-        // 3) Build messenger transports for async transitions
         if ($asyncByWorkflow) {
             $prefix = QueueNameUtil::isDoctrineDsn($asyncTransportDsn)
                 ? ''
