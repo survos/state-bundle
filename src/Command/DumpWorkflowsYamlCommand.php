@@ -8,6 +8,7 @@ use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\Workflow\WorkflowInterface;
 use Symfony\Component\Workflow\StateMachine;
 use Symfony\Component\Yaml\Yaml;
@@ -22,9 +23,9 @@ final class DumpWorkflowsYamlCommand
     private iterable $workflows;
 
     public function __construct(
-        #[\Symfony\Component\DependencyInjection\Attribute\TaggedIterator('workflow.workflow')]
+        #[AutowireIterator('workflow.workflow')]
         iterable $workflows = [],
-        #[\Symfony\Component\DependencyInjection\Attribute\TaggedIterator('workflow.state_machine')]
+        #[AutowireIterator('workflow.state_machine')]
         iterable $stateMachines = []
     ) {
         // merge both iterables

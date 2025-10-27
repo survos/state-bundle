@@ -93,6 +93,7 @@ final class ConsoleEventListener
         $cmd = $event->getCommand();
         $output = $event->getOutput();
         $code = $event->getExitCode();
+        return;
 
         $output->writeln(sprintf(
             '<info>✓ Finished %s</info> with exit code <comment>%d</comment>',
