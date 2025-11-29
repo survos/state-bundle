@@ -25,7 +25,10 @@ use Symfony\Component\Workflow\Event\GuardEvent;
 use Symfony\Component\Workflow\Event\TransitionEvent;
 use function Symfony\Component\String\u;
 
-#[AsCommand('survos:state:generate', 'Generate src/Workflow/(class)Workflow using nette/php-generator')]
+#[AsCommand('survos:state:generate',
+    'Generate src/Workflow/(class)Workflow using nette/php-generator',
+    aliases: ['code:state']
+)]
 #[WhenNot('prod')]
 final class MakeWorkflowCommand extends Command
 {
@@ -73,7 +76,16 @@ final class MakeWorkflowCommand extends Command
         }
 
         $interfaceClass = $shortName . "WFDefinition";
-        $class = $namespace->addInterface($interfaceClass);
+        $class = $namespace->addClass($interfaceClass);
+//        #[Workflow(supports: [Glam::class], name: self::WORKFLOW_NAME)]
+//        class IGlamWorkflow
+//        {
+//            public const WORKFLOW_NAME = 'GlamWorkflow';
+//
+        $class->addAttribute(Workflow::class, [
+            'supports' => [$entityClassName],
+            'name' => new Literal('self::WORKFLOW_NAME')
+        ]);
         $namespace->add($class);
         $class->addConstant('WORKFLOW_NAME', $workflowClass);
         $placeConstants = [];
@@ -95,10 +107,6 @@ final class MakeWorkflowCommand extends Command
         $this->writeFile($namespace, $interfaceClass, $dry);
 
         $fullInterfaceClass = $ns . "\\" . $interfaceClass;
-        if (!interface_exists($fullInterfaceClass)) {
-            $io->error("reload so that  " . $fullInterfaceClass . " can be used. :-(");
-            return self::SUCCESS;
-        }
 
         // now the workflow events
         $namespace = new PhpNamespace($ns);
@@ -106,7 +114,7 @@ final class MakeWorkflowCommand extends Command
         foreach (
             [
                 $entityClassName,
-//            $ns . "\\" . $interfaceClass, //  because they're in the same namespace, this isn't required
+            $ns . "\\" . $interfaceClass, //  because they're in the same namespace, this isn't required
                 Workflow::class,
                 AsGuardListener::class,
                 AsTransitionListener::class,
@@ -129,7 +137,7 @@ final class MakeWorkflowCommand extends Command
 //        $class->addImplement($fullInterfaceClass);
         $class->addAttribute(Workflow::class, [
             'supports' => [new Literal($shortName . '::class')],
-            'name' => new Literal('self::WORKFLOW_NAME')]);
+            'name' => new Literal('WF::WORKFLOW_NAME')]);
         $class->addConstant('WORKFLOW_NAME', $workflowClass);
 
         $method = $class->addMethod('__construct');
@@ -149,7 +157,7 @@ PHP, $shortName));
         // catches everything
         $method = $class->addMethod('onGuard')
             ->setReturnType('void')
-            ->addAttribute(AsGuardListener::class, [new Literal('self::WORKFLOW_NAME')]);
+            ->addAttribute(AsGuardListener::class, [new Literal('WF::WORKFLOW_NAME')]);
         $method
             ->addParameter('event')
             ->setType(GuardEvent::class);
