@@ -52,7 +52,6 @@
     },
     "extra": {
         "symfony": {
-            "require": "^7.3",
             "allow-contrib": "true"
         },
         "branch-alias": {
@@ -61,8 +60,8 @@
     },
     "config": {
         "allow-plugins": {
-            "survos/installer": true,
-            "zenstruck/class-metadata": true
+            "zenstruck/class-metadata": true,
+            "survos/installer": false
         }
     },
     "prefer-stable": true
