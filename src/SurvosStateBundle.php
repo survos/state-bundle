@@ -68,16 +68,6 @@ final class SurvosStateBundle extends AbstractBundle implements CompilerPassInte
     public function process(ContainerBuilder $container): void
     {
 
-        // Find all services that implement the interface
-//        foreach ($container->getDefinitions() as $id => $definition) {
-//            $class = $definition->getClass();
-//            if ($class && is_subclass_of($class, MarkingInterface::class)) {
-//                dump($class, $definition);
-//                $definition->addTag('state.marking_interface');
-//                break;
-//            }
-//        }
-
         // Pull the fully-processed Framework configuration
         $frameworkExt = $container->getExtension('framework');
         $rawFramework = $container->getExtensionConfig('framework');
