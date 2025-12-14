@@ -4,6 +4,12 @@ Configure a workflow using PHP attributes.  Use just one class to configure and 
 
 auto-registration!
 
+## Vibing 
+
+Doctrine-free jsonl workflow: https://claude.ai/share/9c89f52c-1655-44b6-bb86-d773d29bc20b
+
+
+
 @todo: https://joppe.dev/2024/10/11/dynamic-workflows-with-symfony-workflow-component/
 
 for easyadmin integration, also see https://github.com/WandiParis/EasyAdminPlusBundle
