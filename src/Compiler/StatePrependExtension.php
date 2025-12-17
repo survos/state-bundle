@@ -23,7 +23,7 @@ final class StatePrependExtension
         $raw = $builder->getExtensionConfig($alias);
         $queuePrefix       = '';
         $workflowPaths     = [$builder->getParameter('kernel.project_dir') . '/src/Workflow'];
-        $asyncTransportDsn = 'doctrine://default';
+        $asyncTransportDsn = 'doctrine://messenger';
 
         foreach (array_reverse($raw) as $cfg) {
             if (isset($cfg['queue_prefix']))        { $queuePrefix       = (string) $cfg['queue_prefix']; }
