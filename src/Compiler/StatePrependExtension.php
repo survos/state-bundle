@@ -108,8 +108,9 @@ final class StatePrependExtension
                         'options' => [
                             'table_name' => $tableName,
                             'queue_name' => $queue,
-                            'auto_setup' => true,
-                            'use_notify' => true,
+                            'auto_setup' => true, // creates the table in doctrine if it doesn't already exist
+//                            'use_notify' => true, // automatic with postgres
+                            'get_notify_timeout' => 30000,
                         ],
                     ];
                     $transitionToQueueMap[$wfSlug][$tSlug] = $queue;
