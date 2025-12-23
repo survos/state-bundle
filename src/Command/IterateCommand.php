@@ -65,6 +65,7 @@ final class IterateCommand extends Command
         #[Option('force sync (no queues)', shortcut: 'y')] ?bool $sync = null,
         #[Option('limit the number of records')] int $limit = 0,
         #[Option('Use this count for progress bar', shortcut: 'c')] int $count = 0,
+        #[Option('Entity manager name')] ?string $em = null,
     ): int {
         // --limit shim
 //        if ($limit) {
@@ -74,6 +75,13 @@ final class IterateCommand extends Command
         if ($sync) {
             $this->asyncQueueLocator->sync = true;
         }
+
+        $entityManager = $em
+            ? $this->doctrine->getManager($em)
+            : $this->entityManager;
+
+
+
 
         $filters = $this->parseFilters($filter);
 
@@ -469,5 +477,14 @@ final class IterateCommand extends Command
         $countQb->setMaxResults(null);
 
         return (int) $countQb->getQuery()->getSingleScalarResult();
+    }
+
+    private function getManagerForClass(string $className): EntityManagerInterface
+    {
+        $manager = $this->doctrine->getManagerForClass($className);
+        if (!$manager) {
+            throw new \InvalidArgumentException("No entity manager found for class: $className");
+        }
+        return $manager;
     }
 }
