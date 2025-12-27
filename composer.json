@@ -26,7 +26,7 @@
         "symfony/string": "^7.3||^8.0"
     },
     "require-dev": {
-        "jwage/phpamqplib-messenger": "^0.8.5",
+        "jwage/phpamqplib-messenger": "^0.9.0",
         "phpstan/phpstan": "^2.0",
         "symfony/browser-kit": "^7.3||^8.0",
         "symfony/config": "^7.3||^8.0",
@@ -42,7 +42,7 @@
         "nette/php-generator": "^4.1",
         "phpunit/phpunit": "^12",
         "roave/better-reflection": "^6.0",
-        "zenstruck/messenger-monitor-bundle": "^0.5.4",
+        "zenstruck/messenger-monitor-bundle": "^v0.6.0",
         "symfony/ux-chartjs": "^2.21"
     },
     "autoload": {

@@ -31,7 +31,7 @@ use Zenstruck\Messenger\Monitor\Stamp\DescriptionStamp;
 use Zenstruck\Messenger\Monitor\Stamp\TagStamp;
 
 #[AsCommand('state:iterate', 'Iterate a Doctrine entity and dispatch workflow transitions.', aliases: ['iterate'])]
-final class IterateCommand extends Command
+final class IterateCommand
 {
     public function __construct(
         private LoggerInterface $logger,
@@ -44,7 +44,6 @@ final class IterateCommand extends Command
         private AsyncQueueLocator $asyncQueueLocator,
         #[Autowire('%env(DEFAULT_TRANSPORT)%')] private ?string $defaultTransport = null,
     ) {
-        parent::__construct();
     }
 
     public function __invoke(
@@ -79,8 +78,6 @@ final class IterateCommand extends Command
         $entityManager = $em
             ? $this->doctrine->getManager($em)
             : $this->entityManager;
-
-
 
 
         $filters = $this->parseFilters($filter);
