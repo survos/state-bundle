@@ -350,7 +350,7 @@ final class IterateCommand
             $this->showStats($io, $className, $availableTransitions, $workflow);
         }
 
-        $io->success($this->getName() . ' success ' . $className);
+        $io->success(self::class . ' success ' . $className);
         return Command::SUCCESS;
     }
 

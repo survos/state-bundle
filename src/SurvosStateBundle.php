@@ -126,15 +126,21 @@ final class SurvosStateBundle extends AbstractBundle implements CompilerPassInte
                 ->setAutoconfigured(true);
         }
 
-        foreach ([
-            WorkflowController::class,
-            WorkflowDashboardController::class] as $class) {
-            $builder->autowire($class)
+            $builder->autowire(WorkflowController::class)
                 ->setPublic(true)
+                ->setArgument('$workflowHelperService', new Reference(WorkflowHelperService::class))
+                ->setArgument('$serializer', new Reference('serializer'))
+//                ->setAutoconfigured(true)
                 ->setAutowired(true)
-                ->setAutoconfigured(true)
+                ->addTag('container.service_subscriber')
                 ->addTag('controller.service_arguments');
-        }
+
+        $builder->autowire(WorkflowDashboardController::class)
+            ->setPublic(true)
+            ->setAutoconfigured(true)
+            ->setAutowired(true)
+            ->addTag('container.service_subscriber')
+            ->addTag('controller.service_arguments');
 
         foreach ([IterateCommand::class,
                      DumpWorkflowPhpCommand::class,

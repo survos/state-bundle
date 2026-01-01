@@ -16,12 +16,6 @@ final class WorkflowDashboardController extends AbstractController
 {
     public function __construct(
         private WorkflowStatsService $workflowStatsService,
-
-        private EntityInterfaceDetector $entityInterfaceDetector,
-        private EntityManagerInterface $entityManager,
-        private WorkflowHelperService $workflowHelperService,
-        // @todo: move to separate service
-//        private readonly WorkflowStatsService $stats
     ) {}
 
     #[Route('/_state/workflows', name: 'survos_state_workflow_dashboard')]
