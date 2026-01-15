@@ -12,7 +12,7 @@ use Symfony\Component\Messenger\Middleware\StackInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
-use Jwage\PhpAmqpLibMessengerBundle\Transport\AmqpStamp;
+use Jwage\PhpAmqpLibMessengerBundle\Transport\AmqpStamp ;
 
 final class DynamicRoutingMiddleware implements MiddlewareInterface
 {
