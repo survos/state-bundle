@@ -33,7 +33,7 @@ use Survos\StateBundle\Service\WorkflowStatsService;
 use Survos\StateBundle\Traits\EasyMarkingTrait;
 use Survos\StateBundle\Traits\MarkingInterface;
 use Survos\StateBundle\Twig\WorkflowExtension;
-use Symfony\Bundle\FrameworkBundle\Command\WorkflowDumpCommand;
+use Symfony\Component\Workflow\Command\WorkflowDumpCommand;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\Config\Definition\Processor;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
