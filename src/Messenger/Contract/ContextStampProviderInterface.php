@@ -15,5 +15,5 @@ namespace Survos\StateBundle\Messenger\Contract;
 interface ContextStampProviderInterface
 {
     /** @return string|array<string,string|int>|array<int,string> */
-    public function getContextStamp();
+    public function getContextStamp(): string|array;
 }

@@ -42,7 +42,7 @@
     <h1>{{ flowCode }} Workflow</h1>
     <div class="row row-fluid">
         <div class="col-8">
-            <div id="digraphData" class="{{ app.request.get('debug', false) ? 'show' : 'digraph' }}" >
+            <div id="digraphData" class="{{ app.request.query.get('debug', false) ? 'show' : 'digraph' }}" >
                 {{ digraphData|raw }}
             </div>
         </div>
@@ -55,7 +55,7 @@
 {#    <pre>{{ digraphData }}</pre>#}
 
     {# the actual data, will be passed when moved to Stimulus #}
-    <pre id="digraph" class="digraph" style="display:{{ app.request.get('debug', false) ? 'show' : 'none' }};">
+    <pre id="digraph" class="digraph" style="display:{{ app.request.query.get('debug', false) ? 'show' : 'none' }};">
     {{ workflow_digraph(entity, flowCode, 'LR')|raw }}
     </pre>
 {#    <pre>{{ digraphData|raw }}</pre>#}
@@ -82,7 +82,7 @@
                         <span class="fas fa-play"></span>
                         <span class="fw-bold" title="{{ t.name }}">
                             {% set rp = {commandName: iterateCommand , transition: t.name, marking: place} %}
-                            {% if app.request.get('className') %}
+                            {% if app.request.query.get('className') %}
                             {% set rp = rp|merge({className: app.request.get('className')}) %}
                             {% endif %}
                             <a href="{{ path('survos_command', rp ) }}">

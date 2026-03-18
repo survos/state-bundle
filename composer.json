@@ -37,12 +37,12 @@
         "symfony/var-dumper": "^7.3||^8.0",
         "zenstruck/class-metadata": "^1.1",
         "psr/log": "^3.0",
-        "survos/bootstrap-bundle": "^2.0",
         "nette/php-generator": "^4.1",
         "phpunit/phpunit": "^12",
         "roave/better-reflection": "^6.0",
         "zenstruck/messenger-monitor-bundle": "^v0.6.0",
-        "symfony/ux-chartjs": "^2.21"
+        "symfony/ux-chartjs": "^2.21",
+        "survos/tabler-bundle": "^2.0"
     },
     "autoload": {
         "psr-4": {

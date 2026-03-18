@@ -238,7 +238,7 @@ class WorkflowController extends AbstractController
             }
         }
 
-        if ($transitionName = $request->get('transitionName')) {
+        if ($transitionName = $request->query->get('transitionName')) {
             $workflow->apply($entity, $transitionName);
         }
 
