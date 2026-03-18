@@ -2,7 +2,6 @@
 
 namespace Survos\StateBundle\Traits;
 
-use Survos\BootstrapBundle\Entity\SurvosBaseEntity;
 use Survos\StateBundle\Message\TransitionMessage;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Workflow\Transition;

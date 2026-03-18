@@ -5,7 +5,6 @@ declare(strict_types=1);
 
 namespace Survos\StateBundle\Traits;
 
-use Survos\BootstrapBundle\Entity\SurvosBaseEntity;
 use Symfony\Component\Form\Extension\Core\Type\SubmitType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Workflow\Transition;
