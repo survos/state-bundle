@@ -3,6 +3,7 @@
     "description": "Add some tools managing state machines using the Symfony Workflow Component",
     "keywords": [
         "symfony",
+        "symfony-ux",
         "workflow"
     ],
     "license": "MIT",
