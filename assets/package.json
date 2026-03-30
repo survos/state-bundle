@@ -1,5 +1,5 @@
 {
-  "name": "@survos/state-bundle",
+  "name": "@survos/state",
   "description": "display workflow digraph using stimulus",
   "license": "MIT",
   "version": "1.0.3",

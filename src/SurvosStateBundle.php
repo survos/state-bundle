@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Survos\StateBundle;
 
-use Survos\CoreBundle\Traits\HasAssetMapperTrait;
+use Survos\CoreBundle\Bundle\AssetMapperBundle;
 use Survos\StateBundle\Attribute\Transition;
 use Survos\StateBundle\Command\DumpWorkflowPhpCommand;
 use Survos\StateBundle\Command\DumpWorkflowsYamlCommand;
@@ -41,16 +41,15 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\DependencyInjection\Reference;
-use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Component\Messenger\MessageBusInterface;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_locator;
 
-final class SurvosStateBundle extends AbstractBundle implements CompilerPassInterface
+final class SurvosStateBundle extends AssetMapperBundle implements CompilerPassInterface
 {
-    use HasAssetMapperTrait;
+    public const ASSET_PACKAGE = 'state';
 
     public function getAlias(): string
     {
@@ -247,19 +246,7 @@ final class SurvosStateBundle extends AbstractBundle implements CompilerPassInte
 
     public function prependExtension(ContainerConfigurator $container, ContainerBuilder $builder): void
     {
-        // keep this small: asset-mapper + delegate heavy work
-        if ($this->isAssetMapperAvailable($builder)) {
-            $dir = realpath(__DIR__ . '/../assets/');
-            if ($dir && file_exists($dir)) {
-                $builder->prependExtensionConfig('framework', [
-                    'asset_mapper' => [
-                        'paths' => [
-                            $dir => '@survos/state',
-                        ],
-                    ],
-                ]);
-            }
-        }
+        parent::prependExtension($container, $builder);
 
         // Delegate to compile-time builder
         StatePrependExtension::prepend($container, $builder, $this->getAlias());
