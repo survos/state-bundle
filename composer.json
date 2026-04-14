@@ -42,7 +42,7 @@
         "phpunit/phpunit": "^12",
         "roave/better-reflection": "^6.0",
         "zenstruck/messenger-monitor-bundle": "^v0.6.0",
-        "symfony/ux-chartjs": "^2.21",
+        "symfony/ux-chartjs": "^2.0|^3.0",
         "survos/tabler-bundle": "^2.0"
     },
     "autoload": {
