@@ -39,7 +39,7 @@
         "zenstruck/class-metadata": "^1.1",
         "psr/log": "^3.0",
         "nette/php-generator": "^4.1",
-        "phpunit/phpunit": "^12",
+        "phpunit/phpunit": "^13.0",
         "roave/better-reflection": "^6.0",
         "zenstruck/messenger-monitor-bundle": "^v0.6.0",
         "symfony/ux-chartjs": "^2.0|^3.0",
@@ -48,6 +48,11 @@
     "autoload": {
         "psr-4": {
             "Survos\\StateBundle\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Survos\\StateBundle\\Tests\\": "tests/"
         }
     },
     "extra": {

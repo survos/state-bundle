@@ -32,6 +32,7 @@ use Survos\StateBundle\Service\WorkflowListener;
 use Survos\StateBundle\Service\WorkflowStatsService;
 use Survos\StateBundle\Traits\EasyMarkingTrait;
 use Survos\StateBundle\Traits\MarkingInterface;
+use Survos\StateBundle\Twig\Components\WorkflowMarkingComponent;
 use Survos\StateBundle\Twig\WorkflowExtension;
 use Symfony\Component\Workflow\Command\WorkflowDumpCommand;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
@@ -78,7 +79,8 @@ final class SurvosStateBundle extends AssetMapperBundle implements CompilerPassI
 
 
         $container->findDefinition(WorkflowHelperService::class)
-            ->setArgument('$configuration', $workflowConfig);
+            ->setArgument('$configuration', $workflowConfig)
+            ->setArgument('$definitionClasses', $container->getParameter('survos_state.workflow_definition_classes'));
 
         $container->findDefinition(VizCommand::class)
             ->setArgument('$workflows', tagged_iterator('workflow'));
@@ -204,6 +206,9 @@ final class SurvosStateBundle extends AssetMapperBundle implements CompilerPassI
         $builder->autowire(WorkflowExtension::class)
             ->addArgument(new \Symfony\Component\DependencyInjection\Reference(WorkflowHelperService::class))
             ->addTag('twig.extension');
+
+        $builder->autowire(WorkflowMarkingComponent::class)
+            ->setAutoconfigured(true);
 
 //        $builder->autowire(ConfigureFromAttributesService::class)->setAutoconfigured(true)->setPublic(true);
 //        $builder->autowire(TransitionListener::class)->setAutoconfigured(true)->setPublic(true);

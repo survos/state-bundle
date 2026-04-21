@@ -16,8 +16,10 @@ use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
 use Symfony\Component\Workflow\Dumper\GraphvizDumper;
 use Symfony\Component\Workflow\Dumper\StateMachineGraphvizDumper;
 use Symfony\Component\Workflow\Marking;
+use Symfony\Component\Workflow\Metadata\MetadataStoreInterface;
 use Symfony\Component\Workflow\Registry;
 use Symfony\Component\Workflow\StateMachine;
+use Symfony\Component\Workflow\Transition;
 use Symfony\Component\Workflow\SupportStrategy\InstanceOfSupportStrategy;
 use Symfony\Component\Workflow\Workflow;
 use Symfony\Component\Workflow\WorkflowInterface;
@@ -38,6 +40,7 @@ class WorkflowHelperService
         private EntityManagerInterface                                      $entityManager,
         private PropertyAccessorInterface $propertyAccessor,
         private array                                                       $configuration,
+        private array                                                       $definitionClasses = [],
         private ?LoggerInterface                                            $logger = null,
     )
     {
@@ -63,6 +66,117 @@ class WorkflowHelperService
     public function getWorkflowConfiguration(): array
     {
         return $this->configuration;
+    }
+
+    public function getWorkflowDefinitionClass(object|string $subjectOrWorkflow): ?string
+    {
+        $byWorkflow = $this->definitionClasses['by_workflow'] ?? [];
+        $bySupport = $this->definitionClasses['by_support'] ?? [];
+
+        if (is_string($subjectOrWorkflow) && isset($byWorkflow[$subjectOrWorkflow])) {
+            return $byWorkflow[$subjectOrWorkflow];
+        }
+
+        $subjectClass = is_object($subjectOrWorkflow) ? $subjectOrWorkflow::class : $subjectOrWorkflow;
+
+        if (!is_string($subjectClass)) {
+            return null;
+        }
+
+        if (isset($bySupport[$subjectClass][0])) {
+            return $bySupport[$subjectClass][0];
+        }
+
+        foreach ($bySupport as $supportedClass => $definitionClasses) {
+            if (is_a($subjectClass, $supportedClass, true) && isset($definitionClasses[0])) {
+                return $definitionClasses[0];
+            }
+        }
+
+        return null;
+    }
+
+    public function getWorkflowNameForSubjectOrWorkflow(object|string $subjectOrWorkflow): ?string
+    {
+        $byWorkflow = $this->definitionClasses['by_workflow'] ?? [];
+        $definitionClass = $this->getWorkflowDefinitionClass($subjectOrWorkflow);
+
+        if (!$definitionClass) {
+            return is_string($subjectOrWorkflow) && isset($this->configuration[$subjectOrWorkflow])
+                ? $subjectOrWorkflow
+                : null;
+        }
+
+        $workflowName = array_search($definitionClass, $byWorkflow, true);
+
+        return is_string($workflowName) ? $workflowName : null;
+    }
+
+    public function getWorkflowConstant(object|string $subjectOrWorkflow, string $constantName): mixed
+    {
+        $definitionClass = $this->getWorkflowDefinitionClass($subjectOrWorkflow);
+        if (!$definitionClass) {
+            throw new \InvalidArgumentException(sprintf(
+                'Unable to resolve workflow definition for "%s".',
+                is_object($subjectOrWorkflow) ? $subjectOrWorkflow::class : $subjectOrWorkflow
+            ));
+        }
+
+        $constant = $definitionClass . '::' . $constantName;
+        if (!defined($constant)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Workflow definition constant "%s" is not defined.',
+                $constant
+            ));
+        }
+
+        return constant($constant);
+    }
+
+    public function getPlaceMetadataForSubjectOrWorkflow(object|string $subjectOrWorkflow, string $placeConstantOrName): array
+    {
+        $workflow = $this->getWorkflowBySubjectOrWorkflow($subjectOrWorkflow);
+        $placeName = $this->resolveDefinitionValue($subjectOrWorkflow, $placeConstantOrName, 'PLACE_');
+
+        return $workflow->getMetadataStore()->getPlaceMetadata($placeName);
+    }
+
+    public function getTransitionMetadataForSubjectOrWorkflow(object|string $subjectOrWorkflow, string $transitionConstantOrName): array
+    {
+        $workflow = $this->getWorkflowBySubjectOrWorkflow($subjectOrWorkflow);
+        $transitionName = $this->resolveDefinitionValue($subjectOrWorkflow, $transitionConstantOrName, 'TRANSITION_');
+
+        return $this->getTransitionMetadata($transitionName, $workflow);
+    }
+
+    private function getWorkflowBySubjectOrWorkflow(object|string $subjectOrWorkflow): WorkflowInterface
+    {
+        $workflowName = $this->getWorkflowNameForSubjectOrWorkflow($subjectOrWorkflow);
+        if (!$workflowName) {
+            throw new \InvalidArgumentException(sprintf(
+                'Unable to resolve workflow name for "%s".',
+                is_object($subjectOrWorkflow) ? $subjectOrWorkflow::class : $subjectOrWorkflow
+            ));
+        }
+
+        return $this->getWorkflowByCode($workflowName);
+    }
+
+    private function resolveDefinitionValue(object|string $subjectOrWorkflow, string $constantOrValue, string $prefix): string
+    {
+        if (str_starts_with($constantOrValue, $prefix)) {
+            $resolved = $this->getWorkflowConstant($subjectOrWorkflow, $constantOrValue);
+            if (!is_string($resolved)) {
+                throw new \InvalidArgumentException(sprintf(
+                    'Workflow constant "%s" did not resolve to a string.',
+                    $constantOrValue
+                ));
+            }
+
+            return $resolved;
+        }
+
+        return $constantOrValue;
     }
 
 

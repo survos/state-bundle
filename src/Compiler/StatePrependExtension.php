@@ -39,6 +39,10 @@ final class StatePrependExtension
         foreach (($built['resources'] ?? []) as $res) {
             $builder->addResource($res);
         }
+        $builder->setParameter('survos_state.workflow_definition_classes', $built['definition_classes'] ?? [
+            'by_workflow' => [],
+            'by_support' => [],
+        ]);
         if (!empty($built['workflows'])) {
             $builder->prependExtensionConfig('framework', [
                 'workflows' => ['workflows' => $built['workflows']],

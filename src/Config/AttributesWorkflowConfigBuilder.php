@@ -34,7 +34,11 @@ final class AttributesWorkflowConfigBuilder
      * @return array{
      *   workflows: array,
      *   async_transitions: string[],
-     *   resources: FileResource[]
+     *   resources: FileResource[],
+     *   definition_classes: array{
+     *     by_workflow: array<string, string>,
+     *     by_support: array<string, array<int, string>>
+     *   }
      * }
      */
     public static function build(array $workflowDirs): array
@@ -49,6 +53,8 @@ final class AttributesWorkflowConfigBuilder
         $workflows = [];
         $asyncTransitions = [];
         $resources = [];
+        $definitionClassesByWorkflow = [];
+        $definitionClassesBySupport = [];
 
         $finder = (new Finder())->files()->in($workflowDirs)->name('*.php');
 
@@ -94,6 +100,12 @@ final class AttributesWorkflowConfigBuilder
             $wfType   = property_exists($wfAttr, 'type') && $wfAttr->type ? $wfAttr->type : 'state_machine';
             $supports = property_exists($wfAttr, 'supports') && is_array($wfAttr->supports) ? $wfAttr->supports : [];
             $initial  = property_exists($wfAttr, 'initial') ? $wfAttr->initial : null;
+
+            $definitionClassesByWorkflow[$wfName] = $fqcn;
+            foreach ($supports as $supportedClass) {
+                $definitionClassesBySupport[$supportedClass] ??= [];
+                $definitionClassesBySupport[$supportedClass][] = $fqcn;
+            }
 
             // Build places as an ASSOCIATIVE MAP so Symfony can populate placesMetadata
             //   places => [
@@ -212,6 +224,10 @@ final class AttributesWorkflowConfigBuilder
             'workflows'         => $workflows,
             'async_transitions' => array_values(array_unique($asyncTransitions)),
             'resources'         => $resources,
+            'definition_classes' => [
+                'by_workflow' => $definitionClassesByWorkflow,
+                'by_support' => $definitionClassesBySupport,
+            ],
         ];
     }
 

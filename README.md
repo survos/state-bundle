@@ -4,6 +4,61 @@ Configure a workflow using PHP attributes.  Use just one class to configure and 
 
 auto-registration!
 
+## Workflow Constants In Twig
+
+The bundle now exposes additive Twig helpers for resolving workflow definition constants without hard-coding raw place or transition strings in templates.
+
+```twig
+{% set removePlace = workflow_const(image, 'PLACE_REMOVE') %}
+
+{% if image.marking != removePlace %}
+    ...
+{% endif %}
+```
+
+You can also resolve by workflow name:
+
+```twig
+{% set removeTransition = workflow_const('ImageWorkflow', 'TRANSITION_REMOVE') %}
+```
+
+Available helpers:
+
+- `workflow_const(subjectOrWorkflow, constantName)`: resolves a PHP constant from the workflow definition class
+- `workflow_name(subjectOrWorkflow)`: resolves the workflow name from a subject or returns the provided workflow name
+- `survos_workflow_metadata(workflowName, key, metadataSubject)`: existing metadata helper for workflow/place/transition metadata
+
+This is additive. Existing metadata helpers and app-level Twig extensions can remain in place.
+
+## How It Works
+
+During bundle prepend/compile time, `AttributesWorkflowConfigBuilder` now publishes an internal map of:
+
+- `workflow name => workflow definition class`
+- `supported entity class => workflow definition class[]`
+
+`WorkflowHelperService` uses that map to resolve the workflow definition class for either:
+
+- a workflow name like `ImageWorkflow`
+- an entity instance like `App\Entity\Image`
+
+That lets Twig resolve constants from the actual PHP workflow definition instead of relying on brittle string literals in templates.
+
+## Tests
+
+The bundle now includes PHPUnit 13-compatible unit tests covering:
+
+- compile-time workflow definition mapping
+- constant resolution in `WorkflowHelperService`
+- Twig helper exposure in `WorkflowExtension`
+
+Run them from the bundle root:
+
+```bash
+composer install
+vendor/bin/phpunit
+```
+
 ## Vibing 
 
 Doctrine-free jsonl workflow: https://claude.ai/share/9c89f52c-1655-44b6-bb86-d773d29bc20b
@@ -90,4 +145,3 @@ Since the workflow may use a message bus, a reminder on how to configure that wi
 
 https://github.com/survos/SurvosWorkflowHelperBundle/network/dependents
 https://github.com/codereviewvideos/symfony-workflow-example
-

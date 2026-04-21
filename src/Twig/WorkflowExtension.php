@@ -35,6 +35,8 @@ class WorkflowExtension extends AbstractExtension
             ]),
             new TwigFunction('entity_short_class', [$this, 'getShortClass']),
             new TwigFunction('survos_workflow_metadata', $this->getWorkflowMetadata(...)),
+            new TwigFunction('workflow_const', [$this, 'getWorkflowConstant']),
+            new TwigFunction('workflow_name', [$this, 'getWorkflowName']),
             new TwigFunction('entity_class', [$this, 'getClass']),
 
         ];
@@ -85,6 +87,16 @@ class WorkflowExtension extends AbstractExtension
             ->getMetadataStore()
             ->getMetadata($key, $metadataSubject)
             ;
+    }
+
+    public function getWorkflowConstant(object|string $subjectOrWorkflow, string $constantName): mixed
+    {
+        return $this->workflowHelper->getWorkflowConstant($subjectOrWorkflow, $constantName);
+    }
+
+    public function getWorkflowName(object|string $subjectOrWorkflow): ?string
+    {
+        return $this->workflowHelper->getWorkflowNameForSubjectOrWorkflow($subjectOrWorkflow);
     }
 
 

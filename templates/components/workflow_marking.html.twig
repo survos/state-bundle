@@ -1,0 +1,14 @@
+{% set badgeSize = size == 'sm' ? '' : 'fs-6' %}
+<div class="d-inline-flex flex-wrap align-items-center gap-1">
+    {% if showMarking and this.marking %}
+        <span class="badge text-bg-secondary text-uppercase {{ badgeSize }}">{{ this.marking }}</span>
+    {% endif %}
+
+    {% if showTransitions %}
+        {% for transition in this.transitions %}
+            <span class="badge text-bg-light border text-muted" title="Available transition">
+                → {{ transition.label }}
+            </span>
+        {% endfor %}
+    {% endif %}
+</div>
