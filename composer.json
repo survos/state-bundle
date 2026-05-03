@@ -65,8 +65,7 @@
     },
     "config": {
         "allow-plugins": {
-            "zenstruck/class-metadata": true,
-            "survos/installer": false
+            "zenstruck/class-metadata": true
         }
     },
     "prefer-stable": true

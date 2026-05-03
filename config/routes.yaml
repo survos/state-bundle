@@ -1,5 +1,0 @@
-survos_state:
-  type: attribute
-  resource:
-    path: '@SurvosStateBundle/src/Controller/'
-    namespace: Survos\StateBundle\Controller

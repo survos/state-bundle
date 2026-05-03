@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Survos\StateBundle;
 
 use Survos\CoreBundle\Bundle\AssetMapperBundle;
+use Survos\CoreBundle\Traits\HasConfigurableRoutes;
 use Survos\StateBundle\Attribute\Transition;
 use Survos\StateBundle\Command\DumpWorkflowPhpCommand;
 use Survos\StateBundle\Command\DumpWorkflowsYamlCommand;
@@ -50,6 +51,8 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_lo
 
 final class SurvosStateBundle extends AssetMapperBundle implements CompilerPassInterface
 {
+    use HasConfigurableRoutes;
+
     public const ASSET_PACKAGE = 'state';
 
     public function getAlias(): string
@@ -62,6 +65,7 @@ final class SurvosStateBundle extends AssetMapperBundle implements CompilerPassI
     {
         parent::build($container);
         $container->addCompilerPass($this);
+        $this->addRouteLoaderCompilerPass($container);
 //        $container->addCompilerPass(new RegisterWorkflowEntitiesPass());
     }
 
@@ -96,6 +100,9 @@ final class SurvosStateBundle extends AssetMapperBundle implements CompilerPassI
 
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
+        $this->captureRouteConfig($config);
+        $this->registerRouteLoader($builder);
+
         // 1) Register middleware + core services
         $builder->autowire(AsyncQueueRoutingMiddleware::class)->setAutoconfigured(true)->setPublic(false);
         $builder->autowire(PrimaryKeyLocator::class)->setAutoconfigured(true)->setPublic(false);
@@ -237,8 +244,9 @@ final class SurvosStateBundle extends AssetMapperBundle implements CompilerPassI
 
     public function configure(DefinitionConfigurator $definition): void
     {
-        $definition->rootNode()
-            ->children()
+        $children = $definition->rootNode()->children();
+        $this->addRouteOptions($children, '/state');
+        $children
             // Prefix is only used for non-Doctrine brokers. Empty by default.
             ->scalarNode('queue_prefix')->defaultValue('')->end()
             ->scalarNode('base_layout')->defaultValue('base.html.twig')->end()
@@ -246,7 +254,7 @@ final class SurvosStateBundle extends AssetMapperBundle implements CompilerPassI
             ->arrayNode('workflow_paths')->prototype('scalar')->end()
             ->defaultValue(['%kernel.project_dir%/src/Workflow'])->end()
             ->scalarNode('async_transport_dsn')->defaultValue('doctrine://default')->end()
-            ->end();
+        ->end();
     }
 
     public function prependExtension(ContainerConfigurator $container, ContainerBuilder $builder): void
