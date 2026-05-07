@@ -62,6 +62,7 @@ final class IterateCommand
         #[Option('filter using urlQuerystring style')] string $filter='',
         #[Option('Show counts per marking and exit', shortcut: 's')] ?bool $stats = null,
         #[Option('force sync (no queues)', shortcut: 'y')] ?bool $sync = null,
+        #[Option('What to do with chained transitions: async|sync|none. Default: sync when --sync, else async.')] ?string $cascade = null,
         #[Option('limit the number of records')] int $limit = 0,
         #[Option('Use this count for progress bar', shortcut: 'c')] int $count = 0,
         #[Option('Entity manager name')] ?string $em = null,
@@ -71,7 +72,18 @@ final class IterateCommand
 //            $io->warning('--limit is deprecated; use --max.');
 //            $max = $limit;
 //        }
-        if ($sync) {
+        // Resolve cascade mode. Default preserves backward compat:
+        //   --sync alone                → cascade=sync (today's behavior)
+        //   no --sync                   → cascade=async (don't surprise async runs)
+        //   --cascade=… overrides
+        $cascadeMode = $cascade ?? ($sync ? 'sync' : 'async');
+        if (!in_array($cascadeMode, ['async', 'sync', 'none'], true)) {
+            $io->error(sprintf('--cascade must be async|sync|none, got "%s"', $cascadeMode));
+            return Command::FAILURE;
+        }
+        // Sync transport: messenger dispatches resolve in-process. Drives both
+        // --sync alone (cascade=sync) and an explicit --cascade=sync.
+        if ($cascadeMode === 'sync') {
             $this->asyncQueueLocator->sync = true;
         }
 
@@ -292,12 +304,19 @@ final class IterateCommand
 //                    $stamps = array_merge($stamps, $this->asyncQueueLocator->stampsFor($workflowName, $transition));
 //                }
 
-                $msg = new TransitionMessage($key, $className, $transition, $workflowName);
-                $stamps = $this->asyncQueueLocator->stamps($msg);
-                $this->bus->dispatch(
-                    $msg,
-                    $stamps
-                );
+                if ($sync) {
+                    // Direct apply() — skip the messenger wrapper for THIS transition
+                    // so listener stack traces / dd()s land in this process. The
+                    // cascade context tells WorkflowListener whether to dispatch
+                    // chained transitions ('none' suppresses, 'sync'/'async' both
+                    // dispatch normally; transport mode is handled separately).
+                    $workflow->apply($item, $transition, ['cascade' => $cascadeMode]);
+                    $this->entityManager->flush();
+                } else {
+                    $msg = new TransitionMessage($key, $className, $transition, $workflowName);
+                    $stamps = $this->asyncQueueLocator->stamps($msg);
+                    $this->bus->dispatch($msg, $stamps);
+                }
             } else {
                 // No workflow: emit a row event and let listeners handle it
                 $this->eventDispatcher->dispatch(new RowEvent(

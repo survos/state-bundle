@@ -36,6 +36,9 @@ final class WorkflowListener
     #[AsEnteredListener]
     public function onEntered(EnteredEvent $event): void
     {
+        if ($this->cascadeSuppressed($event->getContext())) {
+            return;
+        }
 
         $subject  = $event->getSubject();
         $workflow = $this->workflowHelperService->getWorkflow($subject, $event->getWorkflowName());
@@ -59,6 +62,10 @@ final class WorkflowListener
     #[AsCompletedListener(priority: -50)]
     public function onCompleted(CompletedEvent $event): void
     {
+        if ($this->cascadeSuppressed($event->getContext())) {
+            return;
+        }
+
         $subject   = $event->getSubject();
         $workflow  = $this->workflowHelperService->getWorkflow($subject, $event->getWorkflowName());
         $fromTrans = $event->getTransition();
@@ -74,6 +81,17 @@ final class WorkflowListener
             // Sequential semantics: stop after first applicable next
             break;
         }
+    }
+
+    /**
+     * Honor the iterate command's --cascade=none flag (and any future caller
+     * that wants to suppress the chained dispatch). The signal travels via
+     * the apply() context array; iterate sets ['cascade' => 'none'] when the
+     * operator wants to stop after the named transition.
+     */
+    private function cascadeSuppressed(array $context): bool
+    {
+        return ($context['cascade'] ?? null) === 'none';
     }
 
     private function dispatchTransition(WorkflowInterface $workflow, object $subject, string $transition, ?string $atPlace = null): void
