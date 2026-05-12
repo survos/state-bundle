@@ -1,14 +1,109 @@
-{% set badgeSize = size == 'sm' ? '' : 'fs-6' %}
-<div class="d-inline-flex flex-wrap align-items-center gap-1">
-    {% if showMarking and this.marking %}
-        <span class="badge text-bg-secondary text-uppercase {{ badgeSize }}">{{ this.marking }}</span>
-    {% endif %}
+{% set marking = this.marking %}
+{% set placeMeta = this.placeMeta %}
+{% set transitions = this.transitions %}
+{% set canApply = this.globalKey and this.workflowCode %}
+{% set entityId = subject.erp.entityId %}
+{% set baseParams = canApply ? {globalKey: this.globalKey, workflowCode: this.workflowCode, entityId: entityId} : {} %}
+{% set applyParams = (this.redirectUrl and canApply) ? baseParams|merge({redirectUrl: this.redirectUrl}) : baseParams %}
+{% set enabled = transitions|filter(t => t.enabled) %}
+{% set blocked = transitions|filter(t => not t.enabled) %}
 
-    {% if showTransitions %}
-        {% for transition in this.transitions %}
-            <span class="badge text-bg-light border text-muted" title="Available transition">
-                → {{ transition.label }}
-            </span>
+{# ── badge-only (no transitions) ─────────────────────────────────────── #}
+{% if not showTransitions %}
+
+    <span class="badge text-bg-{{ placeMeta.bgColor ?? 'secondary' }} text-uppercase">{{ marking }}</span>
+
+{# ── inline: place badge + available action buttons ──────────────────── #}
+{% elseif this.layout == 'inline' %}
+
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="badge text-bg-{{ placeMeta.bgColor ?? 'secondary' }} fs-6 font-monospace">{{ marking }}</span>
+        {% if subject.allPendingSteps is defined and subject.pendingCount > 0 %}
+            {% for step in subject.allPendingSteps %}
+                <span class="badge text-bg-warning font-monospace">{{ step }}</span>
+            {% endfor %}
+        {% endif %}
+        {% for t in enabled %}
+            {% if canApply %}
+                <a href="{{ path('survos_state_debug_apply', applyParams|merge({transition: t.name})) }}"
+                   class="btn btn-sm btn-primary apply-btn" title="{{ t.description }}">
+                    <span class="apply-label">{{ t.label }}</span>
+                    <span class="apply-spinner d-none spinner-border spinner-border-sm" role="status"></span>
+                </a>
+            {% else %}
+                <span class="badge text-bg-primary">→ {{ t.label }}</span>
+            {% endif %}
         {% endfor %}
-    {% endif %}
-</div>
+        {% if enabled is empty %}
+            <span class="text-muted small">no transitions available</span>
+        {% endif %}
+    </div>
+
+{# ── table: full transition table matching the debug page ────────────── #}
+{% else %}
+
+    <div class="d-flex flex-column gap-3">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge text-bg-{{ placeMeta.bgColor ?? 'secondary' }} fs-6 font-monospace">{{ marking }}</span>
+            {% if placeMeta.label is defined %}<strong>{{ placeMeta.label }}</strong>{% endif %}
+            {% if placeMeta.description is defined %}<span class="text-muted small">— {{ placeMeta.description }}</span>{% endif %}
+        </div>
+
+        {% if subject.allPendingSteps is defined and subject.pendingCount > 0 %}
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small">Pending ({{ subject.pendingCount }}):</span>
+                {% for step in subject.allPendingSteps %}
+                    <span class="badge text-bg-warning font-monospace">{{ step }}</span>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <table class="table table-sm table-bordered align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>Transition</th><th>Description</th><th></th></tr>
+            </thead>
+            <tbody>
+            {% for t in transitions %}
+                <tr class="{{ t.enabled ? 'table-success' : 'text-muted' }}">
+                    <td class="font-monospace fw-semibold">{{ t.name }}</td>
+                    <td class="small">
+                        {{ t.description }}
+                        {% if t.enabled and subject.allPendingSteps is defined and subject.pendingCount > 0 %}
+                            <div class="mt-1">
+                                {% for step in subject.allPendingSteps %}
+                                    <span class="badge text-bg-warning font-monospace">{{ step }}</span>
+                                {% endfor %}
+                                <span class="text-muted">pending</span>
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if t.enabled and canApply %}
+                            <a href="{{ path('survos_state_debug_apply', applyParams|merge({transition: t.name})) }}"
+                               class="btn btn-sm btn-primary apply-btn">
+                                <span class="apply-label">Apply</span>
+                                <span class="apply-spinner d-none spinner-border spinner-border-sm" role="status"></span>
+                            </a>
+                        {% elseif t.guard %}
+                            <span class="badge text-bg-light border text-muted font-monospace small" title="{{ t.guard }}">guarded</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+{% endif %}
+
+{% if canApply %}
+<script>
+    document.querySelectorAll('.apply-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            btn.classList.add('disabled');
+            btn.querySelector('.apply-label').classList.add('d-none');
+            btn.querySelector('.apply-spinner').classList.remove('d-none');
+        });
+    });
+</script>
+{% endif %}

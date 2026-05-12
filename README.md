@@ -1,6 +1,11 @@
 # workflow-helper-bundle
 
-Configure a workflow using PHP attributes.  Use just one class to configure and act on the workflow events.  (Or create an interface with the configuration for easy separation).
+Configure a workflow using PHP attributes.  Prefer separating the durable workflow definition from the event listener/orchestrator:
+
+- `*Flow` is the attribute definition class, for example `ImageFlow` or `SubmissionFlow`.
+- `*Workflow` is the listener/service class that reacts to transitions, queues work, and applies app policy, for example `ImageWorkflow`.
+
+Older apps may still use `*WF`, `*WorkflowInterface`, or a single class that both defines and handles the workflow. New code should use `*Flow` for the definition because it is short, readable, and leaves `Workflow` for the runtime service.
 
 auto-registration!
 
@@ -19,7 +24,7 @@ The bundle now exposes additive Twig helpers for resolving workflow definition c
 You can also resolve by workflow name:
 
 ```twig
-{% set removeTransition = workflow_const('ImageWorkflow', 'TRANSITION_REMOVE') %}
+{% set removeTransition = workflow_const('ImageFlow', 'TRANSITION_REMOVE') %}
 ```
 
 Available helpers:
@@ -39,7 +44,7 @@ During bundle prepend/compile time, `AttributesWorkflowConfigBuilder` now publis
 
 `WorkflowHelperService` uses that map to resolve the workflow definition class for either:
 
-- a workflow name like `ImageWorkflow`
+- a workflow name like `ImageFlow`
 - an entity instance like `App\Entity\Image`
 
 That lets Twig resolve constants from the actual PHP workflow definition instead of relying on brittle string literals in templates.
@@ -72,16 +77,19 @@ for easyadmin integration, also see https://github.com/WandiParis/EasyAdminPlusB
 
 ```php
 <?php
-// SubmissionWorkflowInterface.php
+// SubmissionFlow.php
 
 namespace App\Workflow;
 
+use App\Entity\Submission;
 use Survos\StateBundle\Attribute\Place;
 use Survos\StateBundle\Attribute\Transition;
+use Survos\StateBundle\Attribute\Workflow;
 
-interface SubmissionWorkflowInterface
+#[Workflow(supports: [Submission::class], name: self::WORKFLOW_NAME)]
+final class SubmissionFlow
 {
-    const WORKFLOW_NAME='SubmissionWorkflow';
+    const WORKFLOW_NAME='SubmissionFlow';
 
     #[Place(initial: true, metadata: ['description' => "starting place after submission"])]
     const PLACE_NEW='new';
@@ -107,7 +115,7 @@ interface SubmissionWorkflowInterface
 }
 ```
 
-Now create a class that implements the interface (to get the constants) and acts on the events.
+Now create a separate `SubmissionWorkflow` service/listener that uses these constants and acts on workflow events. The definition class stays declarative; the workflow class owns behavior.
 
 
 

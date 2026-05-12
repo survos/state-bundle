@@ -1,0 +1,135 @@
+{% extends '@SurvosState/layout.html.twig' %}
+
+{% block title %}Debug: {{ workflowCode }} — {{ class|split('\\')|last }} #{{ entityId }}{% endblock %}
+
+{% block survos_workflow_body %}
+{% set baseParams = {globalKey: globalKey, workflowCode: workflowCode, entityId: entityId} %}
+{% set applyParams = redirectUrl ? baseParams|merge({redirectUrl: redirectUrl}) : baseParams %}
+<div class="container py-4" style="max-width: 900px;">
+
+    {# ── header ─────────────────────────────────────────────────────── #}
+    <div class="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
+        <div>
+            <h1 class="h4 mb-1">{{ workflowCode }} — {{ class|split('\\')|last }} #{{ entityId }}</h1>
+            <div class="text-muted small font-monospace">{{ class }}</div>
+        </div>
+        <a href="{{ path('survos_state_debug_apply', applyParams|merge({transition: '_hard_reset'})) }}"
+           class="btn btn-sm btn-outline-danger"
+           onclick="return confirm('Reset marking to initial place?')">
+            Hard Reset
+        </a>
+    </div>
+
+    {# ── flashes ─────────────────────────────────────────────────────── #}
+    {% for type, messages in app.flashes(['success', 'warning', 'danger']) %}
+        {% for msg in messages %}
+            <div class="alert alert-{{ type }} py-2">{{ msg }}</div>
+        {% endfor %}
+    {% endfor %}
+
+    {# ── current marking ─────────────────────────────────────────────── #}
+    <div class="card mb-4">
+        <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
+            <div>
+                <span class="text-muted small">Current marking</span><br>
+                <span class="badge text-bg-{{ placeMeta.bgColor ?? 'secondary' }} fs-6 font-monospace">{{ marking }}</span>
+            </div>
+            {% if placeMeta.label is defined %}
+                <div>
+                    <span class="text-muted small">Label</span><br>
+                    <strong>{{ placeMeta.label }}</strong>
+                </div>
+            {% endif %}
+            {% if placeMeta.description is defined %}
+                <div>
+                    <span class="text-muted small">Description</span><br>
+                    <span>{{ placeMeta.description }}</span>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ── pending task queue ───────────────────────────────────────────── #}
+    {% if entity.allPendingSteps is defined and entity.pendingCount > 0 %}
+    <div class="alert alert-warning py-2 d-flex align-items-center gap-2 mb-3">
+        <strong>Pending steps ({{ entity.pendingCount }}):</strong>
+        {% for step in entity.allPendingSteps %}
+            <span class="badge text-bg-warning font-monospace">{{ step }}</span>
+        {% endfor %}
+        <span class="text-muted small ms-1">(guard blocks advance until all steps are consumed)</span>
+    </div>
+    {% endif %}
+
+    {# ── transition table ─────────────────────────────────────────────── #}
+    <table class="table table-bordered table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <th style="width: 1%"></th>
+                <th>Transition</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Label / Description</th>
+                <th style="width: 1%"></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for t in transitions %}
+            <tr class="{{ t.enabled ? 'table-success' : '' }}">
+                <td class="text-center">
+                    {% if t.enabled %}
+                        <span class="text-success" title="Available">&#10003;</span>
+                    {% else %}
+                        <span class="text-muted">&#8212;</span>
+                    {% endif %}
+                </td>
+                <td class="font-monospace fw-semibold">{{ t.name }}</td>
+                <td>
+                    {% for from in t.froms %}
+                        <span class="badge text-bg-light border font-monospace">{{ from }}</span>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% for to in t.tos %}
+                        <span class="badge text-bg-light border font-monospace">{{ to }}</span>
+                    {% endfor %}
+                </td>
+                <td class="small">
+                    {% if t.meta.label is defined %}<strong>{{ t.meta.label }}</strong>{% endif %}
+                    {% if t.meta.description is defined %}<div class="text-muted">{{ t.meta.description }}</div>{% endif %}
+                </td>
+                <td>
+                    {% if t.enabled %}
+                        <a href="{{ path('survos_state_debug_apply', applyParams|merge({transition: t.name})) }}"
+                           class="btn btn-sm btn-primary text-nowrap apply-btn">
+                            <span class="apply-label">Apply</span>
+                            <span class="apply-spinner d-none spinner-border spinner-border-sm" role="status"></span>
+                        </a>
+                    {% elseif t.meta.guard is defined %}
+                        <span class="text-muted small font-monospace" title="{{ t.meta.guard }}">guarded</span>
+                        {% if entity.allPendingSteps is defined and entity.allPendingSteps is not empty %}
+                            {% for step in entity.allPendingSteps %}
+                                <span class="badge text-bg-warning font-monospace">{{ step }}</span>
+                            {% endfor %}
+                        {% endif %}
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+</div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        document.querySelectorAll('.apply-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                btn.classList.add('disabled');
+                btn.querySelector('.apply-label').classList.add('d-none');
+                btn.querySelector('.apply-spinner').classList.remove('d-none');
+            });
+        });
+    </script>
+{% endblock %}

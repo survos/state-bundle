@@ -15,6 +15,7 @@ use Survos\StateBundle\Command\StateStatsCommand;
 use Survos\StateBundle\Command\VizCommand;
 use Survos\StateBundle\Compiler\RegisterWorkflowEntitiesPass;
 use Survos\StateBundle\Compiler\StatePrependExtension;
+use Survos\StateBundle\Controller\TransitionDebugController;
 use Survos\StateBundle\Controller\WorkflowController;
 use Survos\StateBundle\Controller\WorkflowDashboardController;
 use Survos\StateBundle\Doctrine\PostLoadSetEnabledTransitionsListener;
@@ -146,6 +147,12 @@ final class SurvosStateBundle extends AssetMapperBundle implements CompilerPassI
         $builder->autowire(WorkflowDashboardController::class)
             ->setPublic(true)
             ->setAutoconfigured(true)
+            ->setAutowired(true)
+            ->addTag('container.service_subscriber')
+            ->addTag('controller.service_arguments');
+
+        $builder->autowire(TransitionDebugController::class)
+            ->setPublic(true)
             ->setAutowired(true)
             ->addTag('container.service_subscriber')
             ->addTag('controller.service_arguments');

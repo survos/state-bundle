@@ -4,6 +4,16 @@ namespace Survos\StateBundle\Traits;
 
 interface MarkingInterface
 {
+    /** Pending steps keyed by phase (transition name). */
+    public array $pendingSteps { get; set; }
+
+    public function addPendingStep(string $step, string $phase): static;
+
+    public function shiftPendingStep(string $phase): ?string;
+
+    /** Count steps for a phase — EL guard example: subject.pendingCount('observe') == 0 */
+    public function pendingCount(string $phase): int;
+
     public function getMarking(): ?string;
 
     public function setMarking(?string $marking, $context = []): self;

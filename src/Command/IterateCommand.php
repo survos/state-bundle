@@ -134,8 +134,9 @@ final class IterateCommand
         $availableTransitions = [];
 
         $grouped = $this->workflowHelperService->getWorkflowsGroupedByClass();
-        if (isset($grouped[$className][0])) {
-            $workflowName ??= $grouped[$className][0];
+        $workflowNames = $this->workflowNamesForClass($className, $grouped);
+        if (isset($workflowNames[0])) {
+            $workflowName ??= $workflowNames[0];
             $workflow = $this->workflowHelperService->getWorkflowByCode($workflowName);
 
             // Build from->transitions map and list of places
@@ -395,6 +396,16 @@ final class IterateCommand
         return $store->getMetadata('description', $t) ?? null;
     }
 
+    private function wfTransitionInfo(WorkflowInterface $workflow, Transition $t): ?string
+    {
+        $store = $workflow->getMetadataStore();
+        if (method_exists($store, 'getTransitionMetadata')) {
+            $meta = $store->getTransitionMetadata($t);
+            return $meta['info'] ?? null;
+        }
+        return $store->getMetadata('info', $t) ?? null;
+    }
+
     private function wfTransitionGuard(WorkflowInterface $workflow, Transition $t): ?string
     {
         $store = $workflow->getMetadataStore();
@@ -423,14 +434,14 @@ final class IterateCommand
             $markingHelp = null;
             if (method_exists($store, 'getPlaceMetadata')) {
                 $pm = $store->getPlaceMetadata($name);
-                $markingHelp = $pm['description'] ?? null;
+                $markingHelp = $pm['info'] ?? null;
             } else {
-                $markingHelp = $store->getMetadata('description', $name) ?? null;
+                $markingHelp = $store->getMetadata('info', $name) ?? null;
             }
 
             $lines = [];
             foreach ($availableTransitions[$name] ?? [] as $t) {
-                $desc = $this->wfTransitionDescription($workflow, $t);
+                $desc = $this->wfTransitionInfo($workflow, $t);
                 $lines[] = sprintf('(%s) %s', $t->getName(), $desc ?? '');
             }
 
@@ -438,6 +449,26 @@ final class IterateCommand
         }
 
         $table->render();
+    }
+
+    /**
+     * @param array<class-string, list<string>> $grouped
+     * @return list<string>
+     */
+    private function workflowNamesForClass(string $className, array $grouped): array
+    {
+        if (isset($grouped[$className])) {
+            return $grouped[$className];
+        }
+
+        $matches = [];
+        foreach ($grouped as $supportedClass => $workflowNames) {
+            if (is_a($className, $supportedClass, true)) {
+                $matches = array_merge($matches, $workflowNames);
+            }
+        }
+
+        return array_values(array_unique($matches));
     }
 
     private function parseFilters(?string $filterString): array

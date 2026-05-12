@@ -23,6 +23,7 @@ use Symfony\Component\Workflow\Transition;
 use Symfony\Component\Workflow\SupportStrategy\InstanceOfSupportStrategy;
 use Symfony\Component\Workflow\Workflow;
 use Symfony\Component\Workflow\WorkflowInterface;
+use function Symfony\Component\String\u;
 
 /**
  * Generate Workflow Diagrams
@@ -397,6 +398,22 @@ class WorkflowHelperService
     {
         SurvosUtils::assertKeyExists($code, $this->getWorkflowsIndexedByName());
         return $this->getWorkflowsIndexedByName()[$code];
+    }
+
+    /**
+     * Resolves an APP_ENTITY_* global key (as produced by field-bundle's EntityMetaPass)
+     * back to a Doctrine-managed FQCN without requiring field-bundle as a dependency.
+     */
+    public function classFromGlobalKey(string $globalKey): string
+    {
+        foreach ($this->entityManager->getMetadataFactory()->getAllMetadata() as $meta) {
+            $computed = u(ltrim($meta->getName(), '\\'))->replace('\\', '_')->snake()->upper()->toString();
+            if ($computed === $globalKey) {
+                return $meta->getName();
+            }
+        }
+
+        throw new \InvalidArgumentException("No entity class found for global key \"$globalKey\".");
     }
 
     public function getCounts(string $class, string $field): array
