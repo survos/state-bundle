@@ -49,7 +49,13 @@ trait MarkingTrait
     /** Flat list of all pending steps across all phases, for display. */
     public function getAllPendingSteps(): array
     {
-        return array_merge(...array_values($this->pendingSteps));
+        $all = [];
+        foreach ($this->pendingSteps as $value) {
+            if (is_array($value)) {
+                array_push($all, ...$value);
+            }
+        }
+        return $all;
     }
 
 //    /** Mirror workflow marking into the base::$status for external tools. */

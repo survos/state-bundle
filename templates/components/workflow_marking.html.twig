@@ -18,9 +18,14 @@
 
     <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="badge text-bg-{{ placeMeta.bgColor ?? 'secondary' }} fs-6 font-monospace">{{ marking }}</span>
-        {% if subject.allPendingSteps is defined and subject.pendingCount > 0 %}
-            {% for step in subject.allPendingSteps %}
-                <span class="badge text-bg-warning font-monospace">{{ step }}</span>
+        {% if subject.pendingSteps is defined %}
+            {% for phase, steps in subject.pendingSteps %}
+                {% if steps|length > 0 %}
+                    <span class="badge text-bg-secondary font-monospace">{{ phase }}:</span>
+                    {% for step in steps %}
+                        <span class="badge text-bg-warning font-monospace">{{ step }}</span>
+                    {% endfor %}
+                {% endif %}
             {% endfor %}
         {% endif %}
         {% for t in enabled %}
@@ -49,13 +54,18 @@
             {% if placeMeta.description is defined %}<span class="text-muted small">— {{ placeMeta.description }}</span>{% endif %}
         </div>
 
-        {% if subject.allPendingSteps is defined and subject.pendingCount > 0 %}
-            <div class="d-flex align-items-center gap-2">
-                <span class="text-muted small">Pending ({{ subject.pendingCount }}):</span>
-                {% for step in subject.allPendingSteps %}
-                    <span class="badge text-bg-warning font-monospace">{{ step }}</span>
-                {% endfor %}
-            </div>
+        {# Summary of all pending steps grouped by phase #}
+        {% if subject.pendingSteps is defined %}
+            {% for phase, steps in subject.pendingSteps %}
+                {% if steps|length > 0 %}
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="text-muted small">{{ phase }} ({{ steps|length }}):</span>
+                        {% for step in steps %}
+                            <span class="badge text-bg-warning font-monospace">{{ step }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endfor %}
         {% endif %}
 
         <table class="table table-sm table-bordered align-middle mb-0">
@@ -68,12 +78,14 @@
                     <td class="font-monospace fw-semibold">{{ t.name }}</td>
                     <td class="small">
                         {{ t.description }}
-                        {% if t.enabled and subject.allPendingSteps is defined and subject.pendingCount > 0 %}
-                            <div class="mt-1">
-                                {% for step in subject.allPendingSteps %}
+                        {# Show pending steps queued for this specific transition #}
+                        {% set phasePending = subject.pendingSteps[t.name] ?? [] %}
+                        {% if phasePending|length > 0 %}
+                            <div class="mt-1 d-flex gap-1 flex-wrap">
+                                {% for step in phasePending %}
                                     <span class="badge text-bg-warning font-monospace">{{ step }}</span>
                                 {% endfor %}
-                                <span class="text-muted">pending</span>
+                                <span class="text-muted">pending ({{ phasePending|length }})</span>
                             </div>
                         {% endif %}
                     </td>

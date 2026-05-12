@@ -50,10 +50,10 @@
     </div>
 
     {# ── pending task queue ───────────────────────────────────────────── #}
-    {% if entity.allPendingSteps is defined and entity.pendingCount > 0 %}
+    {% if entity.allPendingSteps is defined and entity.allPendingSteps|length > 0 %}
     <div class="alert alert-warning py-2 d-flex align-items-center gap-2 mb-3">
-        <strong>Pending steps ({{ entity.pendingCount }}):</strong>
-        {% for step in entity.allPendingSteps %}
+        <strong>Pending steps ({{ entity.allPendingSteps|length }}):</strong>
+        {% for phase, steps in entity.pendingSteps %}{% for step in steps %}
             <span class="badge text-bg-warning font-monospace">{{ step }}</span>
         {% endfor %}
         <span class="text-muted small ms-1">(guard blocks advance until all steps are consumed)</span>
@@ -107,7 +107,7 @@
                     {% elseif t.meta.guard is defined %}
                         <span class="text-muted small font-monospace" title="{{ t.meta.guard }}">guarded</span>
                         {% if entity.allPendingSteps is defined and entity.allPendingSteps is not empty %}
-                            {% for step in entity.allPendingSteps %}
+                            {% for phase, steps in entity.pendingSteps %}{% for step in steps %}
                                 <span class="badge text-bg-warning font-monospace">{{ step }}</span>
                             {% endfor %}
                         {% endif %}
