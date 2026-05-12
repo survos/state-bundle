@@ -18,14 +18,13 @@ use Symfony\Contracts\Service\ServiceProviderInterface;
     name: 'state:queues:dump',
     description: 'Show the async transition map and configured Messenger transports'
 )]
-final class StateQueuesDumpCommand extends Command
+final class StateQueuesDumpCommand
 {
     public function __construct(
         private readonly ParameterBagInterface $params,
         #[Autowire(service: 'messenger.receiver_locator')]
         private readonly ?ServiceProviderInterface $receiverLocator = null,
     ) {
-        parent::__construct();
     }
 
     public function __invoke(

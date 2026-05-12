@@ -30,7 +30,7 @@ use function Symfony\Component\String\u;
     aliases: ['code:state']
 )]
 #[WhenNot('prod')]
-final class MakeWorkflowCommand extends Command
+final class MakeWorkflowCommand
 {
 
     public function __construct(
@@ -38,7 +38,6 @@ final class MakeWorkflowCommand extends Command
         private Environment                                             $twig
     )
     {
-        parent::__construct();
     }
 
 
@@ -56,12 +55,12 @@ final class MakeWorkflowCommand extends Command
             $shortName = (new ReflectionClass($entityClassName))->getShortName();
         } catch (\ReflectionException $e) {
             $io->error($entityClassName . "\n" . $e->getMessage());
-            return self::FAILURE;
+            return Command::FAILURE;
         }
 
         if (!class_exists(PhpNamespace::class)) {
             $io->error("Missing dependency:\n\ncomposer req nette/php-generator");
-            return self::FAILURE;
+            return Command::FAILURE;
         }
 
 
@@ -193,7 +192,7 @@ PHP, $shortName));
         $this->writeFile($namespace, $workflowClass, $dry);
 
 
-        return self::SUCCESS;
+        return Command::SUCCESS;
     }
 
     private function writeFile(PhpNamespace $namespace, string $className, ?bool $dry=false)
