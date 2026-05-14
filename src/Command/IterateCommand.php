@@ -380,7 +380,10 @@ final class IterateCommand
         foreach ($this->doctrine->getManagers() as $entityManager) {
             $classesMetadata = $entityManager->getMetadataFactory()->getAllMetadata();
             foreach ($classesMetadata as $classMetadata) {
-                $entitiesFqcn[lcfirst($classMetadata->getReflectionClass()->getShortName())] = $classMetadata->getName();
+                $shortName = $classMetadata->getReflectionClass()->getShortName();
+                $fqcn = $classMetadata->getName();
+                $entitiesFqcn[$shortName] = $fqcn;
+                $entitiesFqcn[lcfirst($shortName)] = $fqcn;
             }
         }
         return $entitiesFqcn;

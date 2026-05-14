@@ -34,6 +34,19 @@ final class StatePrependExtension
         $projectDir    = (string) $builder->getParameter('kernel.project_dir');
         $workflowPaths = array_map(fn(string $p) => str_replace('%kernel.project_dir%', $projectDir, $p), $workflowPaths);
 
+        // Auto-include workflow dirs from known optional bundles
+        foreach ([
+            'Survos\AiWorkflowBundle\SurvosAiWorkflowBundle',
+        ] as $bundleClass) {
+            if (class_exists($bundleClass)) {
+                $bundleDir = dirname((new \ReflectionClass($bundleClass))->getFileName());
+                $extraPath = $bundleDir . '/Workflow';
+                if (is_dir($extraPath) && !in_array($extraPath, $workflowPaths, true)) {
+                    $workflowPaths[] = $extraPath;
+                }
+            }
+        }
+
         // 1) Build attribute workflows
         $built = AttributesWorkflowConfigBuilder::build($workflowPaths);
         foreach (($built['resources'] ?? []) as $res) {
