@@ -3,8 +3,9 @@ declare(strict_types=1);
 
 namespace Survos\StateBundle;
 
-use Survos\CoreBundle\Bundle\AssetMapperBundle;
-use Survos\CoreBundle\Traits\HasConfigurableRoutes;
+use Survos\Kit\AbstractUxBundle;
+use Survos\Kit\SurvosKitBundle;
+use Survos\Kit\Traits\HasConfigurableRoutes;
 use Survos\StateBundle\Attribute\Transition;
 use Survos\StateBundle\Command\DumpWorkflowPhpCommand;
 use Survos\StateBundle\Command\DumpWorkflowsYamlCommand;
@@ -39,9 +40,9 @@ use Survos\StateBundle\Twig\WorkflowExtension;
 use Symfony\Component\Workflow\Command\WorkflowDumpCommand;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\Config\Definition\Processor;
-use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\DependencyInjection\Kernel\RequiredBundle;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
@@ -50,7 +51,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_locator;
 
-final class SurvosStateBundle extends AssetMapperBundle implements CompilerPassInterface
+#[RequiredBundle(SurvosKitBundle::class)]
+final class SurvosStateBundle extends AbstractUxBundle
 {
     use HasConfigurableRoutes;
 
@@ -65,7 +67,6 @@ final class SurvosStateBundle extends AssetMapperBundle implements CompilerPassI
     public function build(ContainerBuilder $container): void
     {
         parent::build($container);
-        $container->addCompilerPass($this);
         $this->addRouteLoaderCompilerPass($container);
 //        $container->addCompilerPass(new RegisterWorkflowEntitiesPass());
     }
@@ -101,6 +102,8 @@ final class SurvosStateBundle extends AssetMapperBundle implements CompilerPassI
 
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
+        parent::loadExtension($config, $container, $builder);
+
         $this->captureRouteConfig($config);
         $this->registerRouteLoader($builder);
 
