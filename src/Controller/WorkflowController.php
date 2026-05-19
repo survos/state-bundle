@@ -3,7 +3,7 @@
 namespace Survos\StateBundle\Controller;
 
 use Doctrine\ORM\EntityManagerInterface;
-use Survos\CoreBundle\Traits\QueryBuilderHelperInterface;
+use Survos\FieldBundle\Repository\QueryBuilderHelperInterface;
 use Survos\StateBundle\Service\WorkflowHelperService;
 use Survos\StateBundle\Service\WorkflowStatsService;
 use Survos\StateBundle\Traits\MarkingInterface;

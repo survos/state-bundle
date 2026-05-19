@@ -4,8 +4,8 @@ namespace Survos\StateBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
-use Survos\CoreBundle\Traits\QueryBuilderHelperInterface;
-use Survos\CoreBundle\Service\SurvosUtils;
+use Survos\FieldBundle\Repository\QueryBuilderHelperInterface;
+
 use Survos\StateBundle\Message\TransitionMessage;
 use Symfony\Component\DependencyInjection\Attribute\AutowireLocator;
 use Symfony\Component\DependencyInjection\Attribute\TaggedLocator;
@@ -189,7 +189,7 @@ class WorkflowHelperService
             if (method_exists($repo, 'findBygetCountsByField')) {
                 $counts = $repo->findBygetCountsByField('marking'); //
             } else {
-                throw new \Exception("Marking data requires as findBygetCountsByField in the repository, use QueryBuilderHelperInterface from BaseBundle");
+                throw new \Exception("Marking data requires as findBygetCountsByField in the repository, implement Survos\FieldBundle\Repository\QueryBuilderHelperInterface");
             }
         }
         return array_map(fn($marking) => array_merge([
@@ -222,7 +222,7 @@ class WorkflowHelperService
     public function getWorkflow($subject, string $workflowName): WorkflowInterface
     {
 
-        SurvosUtils::assertKeyExists($workflowName, $this->getWorkflowsIndexedByName());
+        assert(array_key_exists($workflowName, $this->getWorkflowsIndexedByName()), "Unknown workflow: $workflowName");
         return $this->getWorkflowsIndexedByName()[$workflowName];
 
 //        /** @var WorkflowInterface $workflow */
@@ -396,7 +396,7 @@ class WorkflowHelperService
 
     public function getWorkflowByCode(string $code)
     {
-        SurvosUtils::assertKeyExists($code, $this->getWorkflowsIndexedByName());
+        assert(array_key_exists($code, $this->getWorkflowsIndexedByName()), "Unknown workflow: $code");
         return $this->getWorkflowsIndexedByName()[$code];
     }
 

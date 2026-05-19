@@ -23,7 +23,6 @@
         "symfony/process": "^7.3||^8.0",
         "symfony/workflow": "^7.3||^8.0",
         "symfony/yaml": "^7.3||^8.0",
-        "survos/core-bundle": "^2.0",
         "survos/kit-bundle": "^2.0",
         "symfony/string": "^7.3||^8.0"
     },

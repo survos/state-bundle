@@ -6,7 +6,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
-use Survos\CoreBundle\Traits\QueryBuilderHelperInterface;
+use Survos\FieldBundle\Repository\QueryBuilderHelperInterface;
 use Survos\StateBundle\Event\RowEvent;
 use Survos\StateBundle\Message\TransitionMessage;
 use Survos\StateBundle\Service\AsyncQueueLocator;
