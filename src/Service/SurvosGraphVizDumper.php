@@ -62,8 +62,8 @@ class SurvosGraphVizDumper extends GraphvizDumper
         $label = $this->formatLabel($definition, $withMetadata, $options);
 
         return $this->startDot($options, $label)
-            . $this->addPlaces($places, $withMetadata)
-            . $this->addTransitions($transitions, $withMetadata)
+            . $this->addPlaces($places)
+            . $this->addTransitions($transitions)
             . $this->addEdges($edges)
             . $this->endDot();
     }
@@ -120,7 +120,7 @@ class SurvosGraphVizDumper extends GraphvizDumper
     /**
      * @internal
      */
-    protected function findTransitions(Definition $definition, bool $withMetadata): array
+    protected function findTransitions(Definition $definition, bool $withMetadata, array $listeners = []): array
     {
         $workflowMetadata = $definition->getMetadataStore();
 
@@ -197,7 +197,7 @@ class SurvosGraphVizDumper extends GraphvizDumper
     /**
      * @internal
      */
-    protected function addPlaces(array $places, bool $withMetadata): string
+    protected function addPlaces(array $places): string
     {
         $code = '';
 
@@ -209,14 +209,12 @@ class SurvosGraphVizDumper extends GraphvizDumper
                 $placeName = $id;
             }
 
-            if ($withMetadata) {
+            if (isset($place['attributes']['metadata'])) {
                 $escapedLabel = \sprintf('<<B>%s</B>%s>', $this->escape($placeName), $this->addMetadata($place['attributes']['metadata']));
                 // Don't include metadata in default attributes used to format the place
                 unset($place['attributes']['metadata']);
             } else {
                 $escapedLabel = \sprintf('"%s"', $this->escape($placeName));
-
-
             }
 
             $code .= \sprintf("  place_%s [label=%s, shape=%s%s];\n", $this->dotize($id), $escapedLabel,
@@ -230,13 +228,12 @@ class SurvosGraphVizDumper extends GraphvizDumper
     /**
      * @internal
      */
-    protected function addTransitions(array $transitions, bool $withMetadata): string
+    protected function addTransitions(array $transitions): string
     {
         $code = '';
 
         foreach ($transitions as $i => $place) {
-            if ($withMetadata) {
-//                $escapedLabel = \sprintf('<<B>%s</B><SUP>1</SUP>%s>', $this->escape($place['name']), $this->addMetadata($place['metadata']));
+            if (!empty($place['metadata'])) {
                 $escapedLabel = \sprintf('<<B>%s</B>%s>', $this->escape($place['name']), $this->addMetadata($place['metadata']));
             } else {
                 $escapedLabel = '"' . $this->escape($place['name']) . '"';
