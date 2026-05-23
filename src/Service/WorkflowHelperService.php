@@ -384,6 +384,10 @@ class WorkflowHelperService
         foreach ($this->configuration as $workflowName => $config) {
             $classes = $config['supports'];
             foreach ($classes as $class) {
+                if (!$this->isMappedEntityClass($class)) {
+                    continue;
+                }
+
                 if (empty($workflowsByClass[$class])) {
                     $workflowsByClass[$class] = [];
                 }
@@ -448,6 +452,10 @@ class WorkflowHelperService
     public function getApproxCount(string $class): ?int
     {
         static $counts = null;
+        if (!$this->isMappedEntityClass($class)) {
+            return null;
+        }
+
         $repo = $this->entityManager->getRepository($class);
 
         try {
@@ -481,7 +489,7 @@ ORDER BY n.nspname, c.relname;");
         // if no analysis
         // Fallback to exact count
         if ($count < 0) {
-            $count = $repo->count();
+            $count = $repo->count([]);
 //            // or $repo->count[]
 //            $count = (int)$repo->createQueryBuilder('e')
 //                ->select('COUNT(e)')
@@ -490,6 +498,25 @@ ORDER BY n.nspname, c.relname;");
         }
 
         return $count;
+    }
+
+    private function isMappedEntityClass(?string $class): bool
+    {
+        if (!$class || $class === 'stdClass' || $class === \stdClass::class) {
+            return false;
+        }
+
+        if (!class_exists($class)) {
+            return false;
+        }
+
+        try {
+            $this->entityManager->getClassMetadata($class);
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
 
