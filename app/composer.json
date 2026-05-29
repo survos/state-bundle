@@ -8,7 +8,7 @@
         "doctrine/doctrine-bundle": "^2.7|^3.0",
         "doctrine/doctrine-migrations-bundle": "^3.2",
         "doctrine/orm": "^2.12 || ^3.3",
-        "survos/state-bundle": "^1.5",
+        "survos/state-bundle": "^2.5",
         "symfony/console": "^7.3||^8.0",
         "symfony/dotenv": "^7.3||^8.0",
         "symfony/flex": "^2.0",
@@ -79,6 +79,5 @@
     "conflict": {
         "symfony/symfony": "*"
     },
-    "minimum-stability": "beta",
     "prefer-stable": true
 }
