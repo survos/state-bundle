@@ -227,6 +227,15 @@ final class SurvosStateBundle extends AbstractUxBundle
         $builder->autowire(WorkflowMarkingComponent::class)
             ->setAutoconfigured(true);
 
+        // Auto-register a "Workflows" dropdown in the Tabler admin navbar (like every
+        // other Survos bundle). Only when tabler-bundle is present; autoconfigure picks
+        // up the #[AsEventListener] on the subscriber.
+        if (class_exists(\Survos\TablerBundle\Event\MenuEvent::class)) {
+            $builder->autowire(\Survos\StateBundle\Menu\StateMenuSubscriber::class)
+                ->setAutowired(true)
+                ->setAutoconfigured(true);
+        }
+
 //        $builder->autowire(ConfigureFromAttributesService::class)->setAutoconfigured(true)->setPublic(true);
 //        $builder->autowire(TransitionListener::class)->setAutoconfigured(true)->setPublic(true);
 //        $builder->autowire(PostLoadSetEnabledTransitionsListener::class)->setAutoconfigured(true)->setPublic(true);
@@ -273,5 +282,17 @@ final class SurvosStateBundle extends AbstractUxBundle
 
         // Delegate to compile-time builder
         StatePrependExtension::prepend($container, $builder, $this->getAlias());
+
+        // Icons used by the Workflows admin-navbar dropdown (StateMenuSubscriber).
+        // They're referenced from PHP, which the ux:icons template scanner can't see,
+        // so declare them as aliases (apps may override in their own ux_icons.yaml).
+        if ($builder->hasExtension('ux_icons')) {
+            $builder->prependExtensionConfig('ux_icons', [
+                'aliases' => [
+                    'sitemap'   => 'tabler:sitemap',
+                    'chart-pie' => 'tabler:chart-pie',
+                ],
+            ]);
+        }
     }
 }
