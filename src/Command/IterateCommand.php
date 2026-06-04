@@ -197,9 +197,13 @@ final class IterateCommand
             $where['marking'] = array_values(array_filter(array_map('trim', explode(',', $marking))));
         }
 
-        // Determine total count
+        // Determine total count using the same filter semantics as iteration.
         if (!$count) {
-            $count = $repo->count($where);
+            $countQb = $this->entityManager->createQueryBuilder()
+                ->select('COUNT(e)')
+                ->from($className, 'e');
+            $this->applyWhereFilters($countQb, $where);
+            $count = (int) $countQb->getQuery()->getSingleScalarResult();
             if (!$count) {
                 $io->warning('No items found for filter: ' . json_encode($where));
                 return Command::SUCCESS;
@@ -241,14 +245,7 @@ final class IterateCommand
 
         // Build query
 //        $qb = $this->entityManager->getRepository($className)->createQueryBuilder('t');
-        foreach ($where as $key => $value) {
-            if (is_array($value)) {
-                $qb->andWhere("e.$key IN (:{$key})");
-            } else {
-                $qb->andWhere("e.$key = :{$key}");
-            }
-            $qb->setParameter($key, $value);
-        }
+        $this->applyWhereFilters($qb, $where);
 
         // Identifier handling (single id only)
         $classMeta = $this->entityManager->getClassMetadata($className);
@@ -472,6 +469,40 @@ final class IterateCommand
         }
 
         return array_values(array_unique($matches));
+    }
+
+    private function applyWhereFilters($qb, array $filters): void
+    {
+        foreach ($filters as $field => $value) {
+            $operator = null;
+            if (str_contains((string) $field, '__')) {
+                [$field, $operator] = explode('__', (string) $field, 2);
+            }
+
+            $parameter = str_replace('.', '_', (string) $field);
+            if ($operator === 'isnull') {
+                $isNull = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                $qb->andWhere(sprintf('e.%s IS %sNULL', $field, $isNull === false ? 'NOT ' : ''));
+                continue;
+            }
+
+            if (is_string($value) && strtolower($value) === 'null') {
+                $qb->andWhere(sprintf('e.%s IS NULL', $field));
+                continue;
+            }
+
+            if (is_string($value) && strtolower($value) === '!null') {
+                $qb->andWhere(sprintf('e.%s IS NOT NULL', $field));
+                continue;
+            }
+
+            if (is_array($value)) {
+                $qb->andWhere(sprintf('e.%s IN (:%s)', $field, $parameter));
+            } else {
+                $qb->andWhere(sprintf('e.%s = :%s', $field, $parameter));
+            }
+            $qb->setParameter($parameter, $value);
+        }
     }
 
     private function parseFilters(?string $filterString): array
