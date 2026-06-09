@@ -56,7 +56,7 @@ final class AsyncQueueLocator
     /** @return TransportNamesStamp[] */
     public function stampsFor(string $workflow, string $transition, ?string $id=null): array
     {
-        assert(false, "use ->stamps(msg)");
+        throw new \LogicException('use ->stamps(msg)');
     }
 
     public function stamps(TransitionMessage $message): array
