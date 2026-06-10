@@ -112,10 +112,16 @@ final class WorkflowListener
         );
         $stamps = $this->asyncQueueLocator->stamps($message);
 
-//        if (class_exists(DescriptionStamp::class)) {
-//            $short = (new \ReflectionClass($subject))->getShortName();
-//            $stamps[] = new DescriptionStamp(sprintf('Next/%s-%s @%s: %s', $short, (string)$id, (string)$atPlace, $transition));
-//        }
+        // Tag/describe the message for zenstruck/messenger-monitor, but only when
+        // that bundle is installed — it is an optional dev dependency, so we must
+        // never hard-fail when its stamp classes are absent.
+        if (class_exists(DescriptionStamp::class)) {
+            $short = (new \ReflectionClass($subject))->getShortName();
+            $stamps[] = new DescriptionStamp(sprintf('Next/%s-%s @%s: %s', $short, (string)$id, (string)$atPlace, $transition));
+        }
+        if (class_exists(TagStamp::class)) {
+            $stamps[] = new TagStamp($transition);
+        }
 
 //        if ($this->asyncQueueLocator->isAsync($workflowName, $transition)) {
             $this->entityManager->flush();
