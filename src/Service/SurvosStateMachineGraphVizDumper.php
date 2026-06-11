@@ -77,6 +77,9 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
             if (null !== $label) {
                 $attributes['name'] = $label;
             }
+            // full description shows on hover (graphviz emits it as an SVG xlink:title)
+            $description = $workflowMetadata->getMetadata('description', $place);
+            $attributes['tooltip'] = $this->normalizeTooltip($description ?? $label ?? $place);
             $places[$place] = [
                 'attributes' => $attributes,
             ];
@@ -141,6 +144,9 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
             if (null !== $arrowColor) {
                 $attributes['color'] = $arrowColor;
             }
+            // full description shows on hover (graphviz emits it as an SVG xlink:title)
+            $description = $workflowMetadata->getMetadata('description', $transition);
+            $attributes['tooltip'] = $this->normalizeTooltip($description ?? $transitionName);
 
             foreach ($transition->getFroms() as $from) {
                 foreach ($transition->getTos() as $to) {
@@ -216,6 +222,14 @@ protected function addPlaces(array $places): string
     protected function escape(string|bool $value): string
     {
         return \is_bool($value) ? ($value ? '1' : '0') : addslashes($value);
+    }
+
+    /**
+     * Collapse whitespace/newlines so a multi-line description renders as a single clean tooltip.
+     */
+    protected function normalizeTooltip(string $value): string
+    {
+        return trim((string) preg_replace('/\s+/', ' ', $value));
     }
 
     protected function addAttributes(array $attributes): string

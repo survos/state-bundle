@@ -13,7 +13,6 @@ use Survos\StateBundle\Command\IterateCommand;
 use Survos\StateBundle\Command\MakeWorkflowCommand;
 use Survos\StateBundle\Command\StateQueuesDumpCommand;
 use Survos\StateBundle\Command\StateStatsCommand;
-use Survos\StateBundle\Command\VizCommand;
 use Survos\StateBundle\Compiler\RegisterWorkflowEntitiesPass;
 use Survos\StateBundle\Compiler\StatePrependExtension;
 use Survos\StateBundle\Controller\TransitionDebugController;
@@ -48,7 +47,6 @@ use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Component\Messenger\MessageBusInterface;
-use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_locator;
 
 #[RequiredBundle(SurvosKitBundle::class)]
@@ -87,9 +85,6 @@ final class SurvosStateBundle extends AbstractUxBundle
         $container->findDefinition(WorkflowHelperService::class)
             ->setArgument('$configuration', $workflowConfig)
             ->setArgument('$definitionClasses', $container->getParameter('survos_state.workflow_definition_classes'));
-
-        $container->findDefinition(VizCommand::class)
-            ->setArgument('$workflows', tagged_iterator('workflow'));
 
         // Provide the map to the locator if parameter is present (set in prepend)
         if ($container->hasParameter('survos_state.async_transition_map')
@@ -164,7 +159,6 @@ final class SurvosStateBundle extends AbstractUxBundle
                      DumpWorkflowPhpCommand::class,
                      DumpWorkflowsYamlCommand::class,
                      MakeWorkflowCommand::class,
-                     VizCommand::class,
                      StateQueuesDumpCommand::class,
                  ] as $commandClass) {
             if (class_exists($commandClass)) {

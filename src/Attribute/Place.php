@@ -17,6 +17,7 @@ class Place
   ) {
         if ($this->info) {
             $this->metadata['info'] = $this->info;
+            $this->metadata['description'] = $this->info; // info is shorthand for description
         }
         if ($this->description) {
             $this->metadata['description'] = $this->description;

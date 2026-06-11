@@ -4,105 +4,151 @@
 {% block page_subtitle "Place count?" %}
 
 {# ux icon lock issue #}
-    {% set iterateCommand = 'workflow' ~ ':iterate' %}
+    {% set iterateCommand = 'state:iterate' %}
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        /* Graph fills its card; the card fills the viewport beside the sidebar. */
+        .workflow-graph-card { height: calc(100vh - 9rem); min-height: 28rem; }
+        .workflow-graph { width: 100%; height: 100%; overflow: hidden; }
+        .workflow-graph svg { width: 100%; height: 100%; }
+        /* native tooltips for nodes/edges */
+        .workflow-graph g.node, .workflow-graph g.edge { cursor: help; }
+        .workflow-sidebar { max-height: calc(100vh - 9rem); overflow-y: auto; }
+    </style>
+{% endblock %}
+
 {% block javascripts %}
     {{ parent() }}
-{#    <script src="https://unpkg.com/viz.js@1.8.0/viz.js" type="javascript/worker"></script>#}
-
-{#    https://stackoverflow.com/questions/50606982/what-is-the-correct-way-to-import-and-use-d3-and-its-submodules-in-es6#}
-{#    <script src="//d3js.org/d3.v5.min.js"></script>#}
-{#    <script src="https://unpkg.com/@hpcc-js/wasm@0.3.11/dist/index.min.js"></script>#}
-{#    <script src="https://unpkg.com/d3-graphviz@3.0.5/build/d3-graphviz.js"></script>#}
     <script type="module">
-        // import d3 from 'd3';
         import {graphviz} from 'd3-graphviz';
-        // import d3-graphviz from 'd3-graphviz';
-        document.addEventListener("DOMContentLoaded", function(){
-            document.querySelectorAll(".digraph").forEach(box => {
-                // box.style.display = 'block';
-                // document.querySelector(".box").style.display = "none";
-                // document.querySelector(".box").style.display = "block";
-                let d = box.textContent;
-                box.innerHTML = '';
-                graphviz('#digraphData').renderDot(d)
 
-            // d3.select(box).graphviz()
-            //     .fade(false)
-            //     .renderDot(d);
-            })
-        })
+        document.addEventListener("DOMContentLoaded", function () {
+            const target = document.getElementById('digraphData');
+            const source = document.getElementById('digraphSource');
+            if (!target || !source) {
+                return;
+            }
+            const dot = source.textContent;
+            const XLINK = 'http://www.w3.org/1999/xlink';
+            const SVGNS = 'http://www.w3.org/2000/svg';
 
+            // graphviz puts the full description on an <a xlink:title>; promote it to a
+            // <title> element so every browser shows it as a native hover tooltip.
+            function promoteTooltips() {
+                target.querySelectorAll('g.node, g.edge').forEach(g => {
+                    const a = g.querySelector('a');
+                    const tip = a && (a.getAttributeNS(XLINK, 'title') || a.getAttribute('xlink:title'));
+                    if (!tip) {
+                        return;
+                    }
+                    let title = g.querySelector(':scope > title');
+                    if (!title) {
+                        title = document.createElementNS(SVGNS, 'title');
+                        g.insertBefore(title, g.firstChild);
+                    }
+                    title.textContent = tip;
+                });
+            }
+
+            function render() {
+                graphviz(target, {useWorker: false, zoom: true})
+                    .width(target.clientWidth)
+                    .height(target.clientHeight)
+                    .fit(true)
+                    .renderDot(dot, promoteTooltips);
+            }
+
+            render();
+
+            let resizeTimer;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(render, 200);
+            });
+        });
     </script>
-
 {% endblock %}
 
 {% block body %}
-
     {% set digraphData = workflow_digraph(entity, flowCode, 'TB') %}
-    <h1>{{ flowCode }} Workflow</h1>
-    <div class="row row-fluid">
-        <div class="col-8">
-            <div id="digraphData" class="{{ app.request.query.get('debug', false) ? 'show' : 'digraph' }}" >
-                {{ digraphData|raw }}
+    {% set isDebug = app.request.query.get('debug', false) %}
+
+    <div class="row g-3 align-items-stretch">
+        <div class="col-12 col-xl-9">
+            <div class="card workflow-graph-card">
+                <div class="card-header">
+                    <h2 class="card-title mb-0">{{ flowCode }} Workflow</h2>
+                    <div class="card-actions">
+                        <span class="badge bg-blue-lt">{{ definition.places|length }} places</span>
+                        <span class="badge bg-green-lt">{{ definition.transitions|length }} transitions</span>
+                    </div>
+                </div>
+                <div class="card-body p-2">
+                    <div id="digraphData" class="workflow-graph"></div>
+                </div>
             </div>
         </div>
 
-        <div class="col-md-4">
-            {{ block('places_with_transitions') }}
+        <div class="col-12 col-xl-3">
+            <div class="card workflow-sidebar">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Places &amp; Transitions</h3>
+                </div>
+                <div class="list-group list-group-flush">
+                    {{ block('places_with_transitions') }}
+                </div>
+            </div>
         </div>
     </div>
 
-{#    <pre>{{ digraphData }}</pre>#}
-
-    {# the actual data, will be passed when moved to Stimulus #}
-    <pre id="digraph" class="digraph" style="display:{{ app.request.query.get('debug', false) ? 'show' : 'none' }};">
-    {{ workflow_digraph(entity, flowCode, 'LR')|raw }}
-    </pre>
-{#    <pre>{{ digraphData|raw }}</pre>#}
-
+    {# DOT source for the client-side renderer (and a quick debug peek) #}
+    <pre id="digraphSource" class="d-none">{{ digraphData|raw }}</pre>
+    {% if isDebug %}
+        <pre class="mt-3">{{ digraphData }}</pre>
+    {% endif %}
 {% endblock %}
 
 {% block places_with_transitions %}
     {% for place in definition.places %}
-        <li>
-            <i class="badge badge-info text-info-emphasis">{{ place }}</i>
-            <b>
-            {{ survos_workflow_metadata(flowCode, 'label', place)|default('~')}}
-            </b>
-                <i>
-                {{ survos_workflow_metadata(flowCode, 'description', place)  }}
-            </i>
-            <a class="hidden-print" href="{{ path('survos_workflow', {flowCode: flowCode, states: place|json_encode}) }}">Set</a>
+        {% set placeLabel = survos_workflow_metadata(flowCode, 'label', place) %}
+        {% set placeDescription = survos_workflow_metadata(flowCode, 'description', place) %}
+        {% set transitions = definition.transitions|filter((t) => place in t.froms) %}
+        <div class="list-group-item">
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-blue-lt">{{ place }}</span>
+                {% if placeLabel %}<strong>{{ placeLabel }}</strong>{% endif %}
+                <a class="ms-auto small text-secondary hidden-print"
+                   href="{{ path('survos_workflow', {flowCode: flowCode, states: place|json_encode}) }}">Set</a>
+            </div>
+            {% if placeDescription %}
+                <div class="text-secondary small mt-1">{{ placeDescription }}</div>
+            {% endif %}
 
-            {% set transitions = definition.transitions|filter( (t) => place in t.froms) %}
-            {{ transitions|length }} Transitions:
-            <ol>
-                {% for t in transitions %}
-                    <li>
-                        <span class="fas fa-play"></span>
-                        <span class="fw-bold" title="{{ t.name }}">
-                            {% set rp = {commandName: iterateCommand , transition: t.name, marking: place} %}
-                            {% if app.request.query.get('className') %}
+            {% if transitions %}
+                <ul class="list-unstyled mt-2 mb-0 ps-2 border-start">
+                    {% for t in transitions %}
+                        {% set transitionLabel = survos_workflow_metadata(flowCode, 'label', t) %}
+                        {% set transitionDescription = survos_workflow_metadata(flowCode, 'description', t) %}
+                        {% set rp = {commandName: iterateCommand, transition: t.name, marking: place} %}
+                        {% if app.request.query.get('className') %}
                             {% set rp = rp|merge({className: app.request.query.get('className')}) %}
-                            {% endif %}
-                            <a href="{{ path('survos_command', rp ) }}">
-                                {{ survos_workflow_metadata(flowCode|default(t.name), 'label', t)|default(t.name) }}
+                        {% endif %}
+                        <li class="mb-1">
+                            <i class="fas fa-play text-muted me-1"></i>
+                            <a class="fw-bold" href="{{ path('survos_command', rp) }}" title="{{ t.name }}">
+                                {{ transitionLabel ?: t.name }}
                             </a>
-                        </span>
-
-                        <span class="fw-light">
-                        {{ survos_workflow_metadata(flowCode, 'description', t)  }}
-                        </span>
-                        <span class="badge badge-info text-info-emphasis">
-                            {{ t.tos|join(',') }}</span>
-                    </li>
-                {% endfor %}
-
-            </ol>
-        </li>
-
+                            <span class="badge bg-azure-lt ms-1">{{ t.tos|join(', ') }}</span>
+                            {% if transitionDescription %}
+                                <div class="text-secondary small">{{ transitionDescription }}</div>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
     {% endfor %}
-
 {% endblock %}
 {% block places %}
 <h3>{{ flowCode }} States</h3>
