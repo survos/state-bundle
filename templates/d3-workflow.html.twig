@@ -9,9 +9,11 @@
     {{ parent() }}
     <style>
         /* Graph fills its card; the card fills the viewport beside the sidebar. */
-        .workflow-graph-card { height: calc(100vh - 9rem); min-height: 28rem; }
+        .workflow-graph-card { height: calc(100vh - 9rem); min-height: 28rem; display: flex; flex-direction: column; }
+        /* card-body must be a flex child that can shrink, so the graph gets a real height to scale into */
+        .workflow-graph-card > .card-body { flex: 1 1 auto; min-height: 0; }
         .workflow-graph { width: 100%; height: 100%; overflow: hidden; }
-        .workflow-graph svg { width: 100%; height: 100%; }
+        .workflow-graph svg { display: block; width: 100%; height: 100%; }
         /* native tooltips for nodes/edges */
         .workflow-graph g.node, .workflow-graph g.edge { cursor: help; }
         .workflow-sidebar { max-height: calc(100vh - 9rem); overflow-y: auto; }
@@ -51,21 +53,20 @@
                 });
             }
 
-            function render() {
-                graphviz(target, {useWorker: false, zoom: true})
-                    .width(target.clientWidth)
-                    .height(target.clientHeight)
-                    .fit(true)
-                    .renderDot(dot, promoteTooltips);
+            // keep graphviz's viewBox but drop the fixed pixel size, so CSS scales the
+            // whole graph to fit the card while preserving its aspect ratio.
+            function onRendered() {
+                const svg = target.querySelector('svg');
+                if (svg) {
+                    svg.removeAttribute('width');
+                    svg.removeAttribute('height');
+                    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                }
+                promoteTooltips();
             }
 
-            render();
-
-            let resizeTimer;
-            window.addEventListener('resize', () => {
-                clearTimeout(resizeTimer);
-                resizeTimer = setTimeout(render, 200);
-            });
+            graphviz(target, {useWorker: false, zoom: false})
+                .renderDot(dot, onRendered);
         });
     </script>
 {% endblock %}
