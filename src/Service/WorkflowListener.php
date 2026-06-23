@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Survos\StateBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Survos\StateBundle\Message\TransitionMessage;
@@ -29,6 +30,7 @@ final class WorkflowListener
         private PropertyAccessorInterface $propertyAccessor,
         private MessageBusInterface $messageBus,
         private EntityManagerInterface $entityManager,
+        private ManagerRegistry $registry,
         private AsyncQueueLocator $asyncQueueLocator,
         private LoggerInterface $logger = new NullLogger(),
     ) {}
@@ -123,28 +125,21 @@ final class WorkflowListener
             $stamps[] = new TagStamp($transition);
         }
 
-//        if ($this->asyncQueueLocator->isAsync($workflowName, $transition)) {
-            $this->entityManager->flush();
-//        }
-
-        // If async, flush before queuing so downstream sees persisted state
+        // Flush the subject's OWN manager (it may be a secondary EM) before queuing so the async
+        // handler reads persisted state.
+        ($this->registry->getManagerForClass($subject::class) ?? $this->entityManager)->flush();
         $this->messageBus->dispatch($message, $stamps);
     }
 
     private function resolveId(object $entity): string|int|null
     {
-        // Try "id" via PropertyAccessor?
+        // Doctrine metadata first — the identifier may be a named field (e.g. DatasetInfo's
+        // `datasetKey`), not `id`. Resolve via the entity's OWN manager: it may live on a secondary
+        // EM (DatasetInfo is on the 'dataset' EM), where the default EM can't map it. This is the
+        // multi-EM async-cascade bug — the lookup failed only because it used the wrong manager.
+        $em = $this->registry->getManagerForClass($entity::class) ?? $this->entityManager;
         try {
-            $val = $this->propertyAccessor->getValue($entity, 'id');
-            if ($val !== null) {
-                return $val;
-            }
-        } catch (\Throwable) {
-            // fall back to Doctrine metadata
-        }
-
-        try {
-            $meta = $this->entityManager->getClassMetadata($entity::class);
+            $meta = $em->getClassMetadata($entity::class);
             $ids  = $meta->getIdentifierValues($entity);
             if (!$ids) {
                 return null;

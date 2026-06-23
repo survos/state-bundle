@@ -266,6 +266,7 @@ final class IterateCommand
 
         // Iterate
         $processed = 0;
+        $failures = 0;
 
         foreach ($qb->getQuery()->toIterable() as $item) {
             $key = $this->propertyAccessor->getValue($item, $identifier);
@@ -309,8 +310,21 @@ final class IterateCommand
                     // cascade context tells WorkflowListener whether to dispatch
                     // chained transitions ('none' suppresses, 'sync'/'async' both
                     // dispatch normally; transport mode is handled separately).
-                    $workflow->apply($item, $transition, ['cascade' => $cascadeMode]);
-                    $entityManager->flush();
+                    try {
+                        $workflow->apply($item, $transition, ['cascade' => $cascadeMode]);
+                        $entityManager->flush();
+                    } catch (\Throwable $e) {
+                        // One bad entity must not abort a bulk run — log, count, continue. A failed
+                        // flush closes Doctrine's EM, so reset it before the next iteration.
+                        $failures++;
+                        $io->writeln(sprintf('  <error>skip %s: %s</error>', (string) $key, $e->getMessage()));
+                        if (!$entityManager->isOpen()) {
+                            $this->doctrine->resetManager($em);
+                            $entityManager = $em
+                                ? $this->doctrine->getManager($em)
+                                : ($this->doctrine->getManagerForClass($className) ?? $this->entityManager);
+                        }
+                    }
                 } else {
                     $msg = new TransitionMessage($key, $className, $transition, $workflowName);
                     $stamps = $this->asyncQueueLocator->stamps($msg);
@@ -347,6 +361,11 @@ final class IterateCommand
         }
 
         $progressBar->finish();
+
+        if ($failures > 0) {
+            $io->newLine(2);
+            $io->warning(sprintf('%d entit%s failed and were skipped (continued past them).', $failures, $failures === 1 ? 'y' : 'ies'));
+        }
 
         if ($table) {
             $table->render();
