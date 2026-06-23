@@ -3,6 +3,7 @@
 namespace Survos\StateBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Survos\FieldBundle\Repository\QueryBuilderHelperInterface;
 
@@ -39,6 +40,7 @@ class WorkflowHelperService
         /** @var WorkflowInterface[] */
         #[AutowireLocator('workflow.state_machine')] private ServiceLocator $workflows,
         private EntityManagerInterface                                      $entityManager,
+        private ManagerRegistry                                             $managerRegistry,
         private PropertyAccessorInterface $propertyAccessor,
         private array                                                       $configuration,
         private array                                                       $definitionClasses = [],
@@ -422,7 +424,9 @@ class WorkflowHelperService
 
     public function getCounts(string $class, string $field): array
     {
-        $repo = $this->entityManager->getRepository($class);
+        // Use the EM that maps the class (DatasetInfo is on the 'dataset' EM, not the default).
+        $em = $this->managerRegistry->getManagerForClass($class) ?? $this->entityManager;
+        $repo = $em->getRepository($class);
         $results = $repo->createQueryBuilder('s')
             ->groupBy('s.' . $field)
             ->select(["s.$field, count(s) as count"])
@@ -510,20 +514,18 @@ ORDER BY n.nspname, c.relname;");
             return false;
         }
 
-        try {
-            $this->entityManager->getClassMetadata($class);
-
-            return true;
-        } catch (\Throwable) {
-            return false;
-        }
+        // Check EVERY entity manager, not just the default — entities like DatasetInfo live on a
+        // secondary EM (the 'dataset' sqlite registry), so the default EM's metadata wouldn't see them.
+        return $this->managerRegistry->getManagerForClass($class) !== null;
     }
 
 
     #[AsMessageHandler]
     public function handleTransition(TransitionMessage $message)
     {
-        if (!$object = $this->entityManager->find($message->getClassName(), $message->getId())) {
+        // Load + flush on the EM that maps the class (DatasetInfo is on the 'dataset' EM, not default).
+        $em = $this->managerRegistry->getManagerForClass($message->getClassName()) ?? $this->entityManager;
+        if (!$object = $em->find($message->getClassName(), $message->getId())) {
             $this->logger->error("Missing $message->id in $message->className");
             $debugMessage = sprintf("missing entity %s for %s", $message->getClassName(), $message->getId());
             return ['message' => $debugMessage];
@@ -546,7 +548,7 @@ ORDER BY n.nspname, c.relname;");
         if ($workflow->can($object, $transition)) {
             $marking = $workflow->apply($object, $transition, $message->getContext());
             // is this the best place to flush?  or only if workflow applied
-            $this->entityManager->flush(); // save the marking and any updates
+            $em->flush(); // save the marking and any updates (on the class's EM)
         } else {
             foreach ($workflow->buildTransitionBlockerList($object, $transition) as $blocker) {
                 $this->logger->info($blocker->getMessage());

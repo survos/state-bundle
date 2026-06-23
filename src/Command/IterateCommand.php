@@ -87,11 +87,6 @@ final class IterateCommand
             $this->asyncQueueLocator->sync = true;
         }
 
-        $entityManager = $em
-            ? $this->doctrine->getManager($em)
-            : $this->entityManager;
-
-
         $filters = $this->parseFilters($filter);
 
 
@@ -121,9 +116,15 @@ final class IterateCommand
             return Command::FAILURE;
         }
 
+        // Use the EM that actually maps this class — DatasetInfo, for instance, lives on the 'dataset'
+        // EM, not the default. Honour --em, else auto-resolve from the class, else fall back to default.
+        $entityManager = $em
+            ? $this->doctrine->getManager($em)
+            : ($this->doctrine->getManagerForClass($className) ?? $this->entityManager);
+
         /** @var QueryBuilderHelperInterface $repo */
-        $repo = $this->entityManager->getRepository($className);
-        $qb = $this->entityManager->createQueryBuilder()
+        $repo = $entityManager->getRepository($className);
+        $qb = $entityManager->createQueryBuilder()
             ->select('e')
             ->from($className, 'e');
 //        $this->applyFilters($qb, $filters);
@@ -199,7 +200,7 @@ final class IterateCommand
 
         // Determine total count using the same filter semantics as iteration.
         if (!$count) {
-            $countQb = $this->entityManager->createQueryBuilder()
+            $countQb = $entityManager->createQueryBuilder()
                 ->select('COUNT(e)')
                 ->from($className, 'e');
             $this->applyWhereFilters($countQb, $where);
@@ -244,11 +245,11 @@ final class IterateCommand
         }
 
         // Build query
-//        $qb = $this->entityManager->getRepository($className)->createQueryBuilder('t');
+//        $qb = $entityManager->getRepository($className)->createQueryBuilder('t');
         $this->applyWhereFilters($qb, $where);
 
         // Identifier handling (single id only)
-        $classMeta = $this->entityManager->getClassMetadata($className);
+        $classMeta = $entityManager->getClassMetadata($className);
         $idFields = $classMeta->getIdentifierFieldNames();
         if (count($idFields) !== 1) {
             $io->error('Composite identifiers are not supported by this command.');
@@ -309,7 +310,7 @@ final class IterateCommand
                     // chained transitions ('none' suppresses, 'sync'/'async' both
                     // dispatch normally; transport mode is handled separately).
                     $workflow->apply($item, $transition, ['cascade' => $cascadeMode]);
-                    $this->entityManager->flush();
+                    $entityManager->flush();
                 } else {
                     $msg = new TransitionMessage($key, $className, $transition, $workflowName);
                     $stamps = $this->asyncQueueLocator->stamps($msg);
@@ -339,7 +340,7 @@ final class IterateCommand
 
             // Optional: free memory on big runs (beware: detaches entities)
             if (($processed % 200) === 0) {
-                $this->entityManager->clear();
+                $entityManager->clear();
             }
 
             $progressBar->advance();
