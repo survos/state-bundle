@@ -55,7 +55,7 @@ class SurvosGraphVizDumper3 extends GraphvizDumper
             . $this->endDot();
     }
 
-    protected function addPlaces(array $places, bool $withMetadata): string
+    protected function addPlaces(array $places, bool $withMetadata = false): string
     {
         $code = '';
 
@@ -90,7 +90,7 @@ class SurvosGraphVizDumper3 extends GraphvizDumper
         return $code;
     }
 
-    protected function addTransitions(array $transitions, bool $withMetadata): string
+    protected function addTransitions(array $transitions, bool $withMetadata = false): string
     {
         $code = '';
 

@@ -113,7 +113,7 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
         return $places;
     }
 
-    protected function findTransitions(Definition $definition, bool $withMetadata): array
+    protected function findTransitions(Definition $definition, bool $withMetadata, array $listeners = []): array
     {
         $opts        = $this->dumpOptions;
         $store       = $definition->getMetadataStore();
@@ -136,7 +136,7 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
         return $transitions;
     }
 
-    protected function addPlaces(array $places, bool $withMetadata): string
+    protected function addPlaces(array $places, bool $withMetadata = false): string
     {
         $code = '';
         foreach ($places as $id => $place) {
@@ -163,7 +163,7 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
         return $code;
     }
 
-    protected function addTransitions(array $transitions, bool $withMetadata): string
+    protected function addTransitions(array $transitions, bool $withMetadata = false): string
     {
         $code = '';
         foreach ($transitions as $i => $tran) {
