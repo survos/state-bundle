@@ -84,6 +84,7 @@ final class SurvosStateBundle extends AbstractUxBundle
 
 
         $container->findDefinition(WorkflowHelperService::class)
+            ->setArgument('$managerRegistry', new Reference('doctrine'))
             ->setArgument('$configuration', $workflowConfig)
             ->setArgument('$definitionClasses', $container->getParameter('survos_state.workflow_definition_classes'));
 
