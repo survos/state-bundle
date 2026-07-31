@@ -28,11 +28,6 @@ final class QueueNameUtil
         return $raw !== '' ? rtrim($raw, '.') . '.' : '';
     }
 
-    public static function isDoctrineDsn(string $dsn): bool
-    {
-        return str_starts_with($dsn, 'doctrine://');
-    }
-
     /** @return array{0:string,1:string} */
     public static function normalizePair(string $workflow, string $transition): array
     {

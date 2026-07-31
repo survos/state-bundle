@@ -269,6 +269,10 @@ final class SurvosStateBundle extends AbstractUxBundle
             ->arrayNode('workflow_paths')->prototype('scalar')->end()
             ->defaultValue(['%kernel.project_dir%/src/Workflow'])->end()
             ->scalarNode('async_transport_dsn')->defaultValue('doctrine://default')->end()
+            // Explicit switch between the two dynamic-queue strategies (see
+            // StatePrependExtension) — not inferred from async_transport_dsn's scheme,
+            // since that's frequently an unresolved %env(...)% placeholder at compile time.
+            ->enumNode('queue_driver')->values(['doctrine', 'rabbitmq'])->defaultValue('doctrine')->end()
         ->end();
     }
 

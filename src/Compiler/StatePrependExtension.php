@@ -24,12 +24,23 @@ final class StatePrependExtension
         $queuePrefix       = '';
         $workflowPaths     = [$builder->getParameter('kernel.project_dir') . '/src/Workflow'];
         $asyncTransportDsn = 'doctrine://default';
+        // Explicit switch, not DSN sniffing: async_transport_dsn is frequently an
+        // unresolved "%env(...)%" placeholder at this point in compilation, so its
+        // scheme can't be relied on to pick the transport-options shape.
+        $queueDriver       = 'doctrine';
 
         foreach (array_reverse($raw) as $cfg) {
             if (isset($cfg['queue_prefix']))        { $queuePrefix       = (string) $cfg['queue_prefix']; }
             if (isset($cfg['workflow_paths']))      { $workflowPaths     = (array)  $cfg['workflow_paths']; }
             if (isset($cfg['async_transport_dsn'])) { $asyncTransportDsn = (string) $cfg['async_transport_dsn']; }
+            if (isset($cfg['queue_driver']))         { $queueDriver       = (string) $cfg['queue_driver']; }
         }
+
+        // Published so other bundles (e.g. tabler-bundle's RabbitMqMenuSubscriber) can
+        // soft-detect "state-bundle is installed and configured for rabbitmq" without a
+        // hard dependency on this bundle's classes.
+        $builder->setParameter('survos_state.queue_driver', $queueDriver);
+        $builder->setParameter('survos_state.async_transport_dsn', $asyncTransportDsn);
 
         $projectDir    = (string) $builder->getParameter('kernel.project_dir');
         $workflowPaths = array_map(fn(string $p) => str_replace('%kernel.project_dir%', $projectDir, $p), $workflowPaths);
@@ -106,7 +117,11 @@ final class StatePrependExtension
         $builder->setParameter('survos_state.async_transition_map', []);
 
         if ($asyncByWorkflow) {
-            $prefix = QueueNameUtil::isDoctrineDsn($asyncTransportDsn)
+            // Doctrine shares one physical table (filtered by queue_name); rabbitmq
+            // shares one physical vhost (one exchange+queue per transition, named
+            // after the queue). Either way the prefix only matters when queue names
+            // could collide across apps sharing the same broker/table.
+            $prefix = $queueDriver === 'doctrine'
                 ? ''
                 : QueueNameUtil::normalizePrefix($queuePrefix);
 
@@ -120,16 +135,29 @@ final class StatePrependExtension
                     $tSlug = QueueNameUtil::normalizeSlug((string) $tName);
                     $queue = $prefix . $wfSlug . '.' . $tSlug;
 
-                    $transports[$queue] = [
-                        'dsn'     => $asyncTransportDsn,
-                        'options' => [
-                            'table_name' => $tableName,
-                            'queue_name' => $queue,
-                            'auto_setup' => true, // creates the table in doctrine if it doesn't already exist
-//                            'use_notify' => true, // automatic with postgres
-                            'get_notify_timeout' => 30000,
+                    $transports[$queue] = match ($queueDriver) {
+                        // jwage/phpamqplib-messenger's minimal DSN form
+                        // (phpamqplib://user:pass@host:port/vhost/exchange) auto-creates
+                        // an exchange + a same-named bound queue — the RabbitMQ analogue
+                        // of Doctrine's "table + queue_name column" trick: one dynamic
+                        // transport per async transition, no manual broker setup.
+                        'rabbitmq' => [
+                            'dsn'     => self::appendPathSegment($asyncTransportDsn, $queue),
+                            'options' => [
+                                'auto_setup' => true,
+                            ],
                         ],
-                    ];
+                        default => [
+                            'dsn'     => $asyncTransportDsn,
+                            'options' => [
+                                'table_name' => $tableName,
+                                'queue_name' => $queue,
+                                'auto_setup' => true, // creates the table in doctrine if it doesn't already exist
+//                                'use_notify' => true, // automatic with postgres
+                                'get_notify_timeout' => 30000,
+                            ],
+                        ],
+                    };
                     $transitionToQueueMap[$wfSlug][$tSlug] = $queue;
                 }
             }
@@ -144,5 +172,13 @@ final class StatePrependExtension
 
             $builder->setParameter('survos_state.async_transition_map', $transitionToQueueMap);
         }
+    }
+
+    /** Append a path segment to a DSN, preserving any query string. */
+    private static function appendPathSegment(string $dsn, string $segment): string
+    {
+        [$base, $query] = str_contains($dsn, '?') ? explode('?', $dsn, 2) : [$dsn, null];
+        $base = rtrim($base, '/') . '/' . $segment;
+        return $query !== null ? $base . '?' . $query : $base;
     }
 }
