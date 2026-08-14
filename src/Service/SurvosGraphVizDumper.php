@@ -16,7 +16,10 @@ class SurvosGraphVizDumper extends GraphvizDumper
     private string $transitionShape = 'box';
 
     protected static array $defaultOptions = [
-        'graph' => ['ratio' => 'compress', 'rankdir' => 'TB'],
+        // No 'ratio' -- 'compress' was fighting the oversized xlabel to force
+        // everything into a small box; with xlabel gone, Graphviz's own
+        // default sizing reads better without a forced ratio.
+        'graph' => ['rankdir' => 'TB'],
         'node'  => [
             'fontsize'  => '8',
             'fontname'  => 'Arial',
@@ -98,8 +101,13 @@ class SurvosGraphVizDumper extends GraphvizDumper
 
             }
             if ($withMetadata) {
-                $attributes['metadata'] = $metadata = $workflowMetadata->getPlaceMetadata($place);
-                $attributes['xlabel'] = "Place " . $place. ': ' . ($metadata['description']??null);
+                // description is deliberately NOT surfaced here (was an unwrapped
+                // xlabel -- Graphviz reserves full canvas width for it with zero
+                // wrapping, so one long sentence blew the whole diagram out to
+                // 748pt wide for a 2-node graph). It's already in the generated
+                // .md file's Places/Transitions list (WorkflowDocsCommand); the
+                // graph only needs the short name + info to stay legible.
+                $attributes['metadata'] = $workflowMetadata->getPlaceMetadata($place);
             }
             $label = $workflowMetadata->getMetadata('label', $place);
             if (null !== $label) {
@@ -159,8 +167,7 @@ class SurvosGraphVizDumper extends GraphvizDumper
             $metadata = [];
             if ($withMetadata) {
                 $metadata = $workflowMetadata->getTransitionMetadata($transition);
-                $attributes['xlabel'] =
-                    'Transition ' . $transition->getName() . ': ' . ($metadata['description']??'');
+                // See the matching comment in findPlaces() -- same unwrapped-xlabel problem.
                 unset($metadata['label']);
             }
 
