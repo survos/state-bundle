@@ -155,8 +155,8 @@ final class IterateCommand
 
             // Pick marking(s)
             if ($marking) {
-                $selected = array_values(array_filter(array_map('trim', explode(',', $marking))));
-                foreach ($selected as $m) {
+                $selectedMarkings = array_values(array_filter(array_map('trim', explode(',', $marking))));
+                foreach ($selectedMarkings as $m) {
                     if (!in_array($m, $places, true)) {
                         $io->error("Invalid marking: {$m}\nValid markings are:\n - " . implode("\n - ", $places));
                         return Command::FAILURE;
@@ -165,12 +165,16 @@ final class IterateCommand
             } else {
                 $question = new ChoiceQuestion('From which marking?', $places);
                 $marking = $io->askQuestion($question);
+                $selectedMarkings = [$marking];
             }
 
-            // Pick transition (if not provided)
+            // Pick transition (if not provided). $marking may be a comma-separated list (e.g.
+            // "raw,normalized,enriched,folio" to re-trigger regardless of current state) — match
+            // against any of the selected markings, not the raw unsplit string (which never
+            // equals a single place name and used to make every multi-marking -t lookup fail).
             $transitions = [];
             foreach ($workflow->getDefinition()->getTransitions() as $t) {
-                if (in_array($marking, $t->getFroms(), true)) {
+                if (array_intersect($selectedMarkings, $t->getFroms()) !== []) {
                     $help = $this->wfTransitionDescription($workflow, $t) ?? $t->getName();
                     if ($guard = $this->wfTransitionGuard($workflow, $t)) {
                         $help .= " (if: {$guard})";
