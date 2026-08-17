@@ -30,6 +30,7 @@ use Survos\StateBundle\Service\ConsoleEventListener;
 use Survos\StateBundle\Service\EntityInterfaceDetector;
 use Survos\StateBundle\Service\PrimaryKeyLocator;
 use Survos\StateBundle\Service\WorkflowHelperService;
+use Survos\StateBundle\Doctrine\InitialPlaceKickoffListener;
 use Survos\StateBundle\Service\WorkflowListener;
 use Survos\StateBundle\Service\WorkflowStatsService;
 use Survos\StateBundle\Traits\EasyMarkingTrait;
@@ -235,6 +236,17 @@ final class SurvosStateBundle extends AbstractUxBundle
 //        $builder->autowire(ConfigureFromAttributesService::class)->setAutoconfigured(true)->setPublic(true);
 //        $builder->autowire(TransitionListener::class)->setAutoconfigured(true)->setPublic(true);
 //        $builder->autowire(PostLoadSetEnabledTransitionsListener::class)->setAutoconfigured(true)->setPublic(true);
+
+        // Starts the workflow for a newly persisted entity, from the initial
+        // place's own `next` — the thing #[Place(initial: true, next: [...])]
+        // has always described and nothing ever implemented. Without it every
+        // app hand-rolls the kickoff and re-decides what the flow already
+        // declares. Inert unless the initial place actually declares `next`.
+        $builder->autowire(InitialPlaceKickoffListener::class)
+            ->setArgument('$workflowHelperService', new Reference(WorkflowHelperService::class))
+            ->setArgument('$messageBus', new Reference(MessageBusInterface::class))
+            ->addTag('doctrine.event_listener', ['event' => 'postPersist'])
+            ->addTag('doctrine.event_listener', ['event' => 'postFlush']);
 
         // Workflow listener wiring
         $builder->autowire(WorkflowListener::class)

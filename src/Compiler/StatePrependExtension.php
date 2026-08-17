@@ -29,7 +29,17 @@ final class StatePrependExtension
         // scheme can't be relied on to pick the transport-options shape.
         $queueDriver       = 'doctrine';
 
-        foreach (array_reverse($raw) as $cfg) {
+        // In load order, so LATER config wins — the same precedence the
+        // Configuration processor applies. ContainerBuilder::getExtensionConfig()
+        // returns configs oldest-first (loadFromExtension appends;
+        // prependExtensionConfig unshifts, which is why prepended defaults sit at
+        // the front and rank lowest). Iterating array_reverse() therefore let the
+        // EARLIEST file win, so config/packages/{env}/ overrides were silently
+        // ignored: packages sets queue_driver: rabbitmq in the base file and
+        // doctrine under when@dev, debug:config correctly reported doctrine, and
+        // this pass still built RabbitMQ transports. Verified by restoring the
+        // array_reverse() and watching the parameter flip back.
+        foreach ($raw as $cfg) {
             if (isset($cfg['queue_prefix']))        { $queuePrefix       = (string) $cfg['queue_prefix']; }
             if (isset($cfg['workflow_paths']))      { $workflowPaths     = (array)  $cfg['workflow_paths']; }
             if (isset($cfg['async_transport_dsn'])) { $asyncTransportDsn = (string) $cfg['async_transport_dsn']; }
