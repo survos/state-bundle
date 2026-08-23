@@ -151,10 +151,33 @@ final class StatePrependExtension
                         // an exchange + a same-named bound queue — the RabbitMQ analogue
                         // of Doctrine's "table + queue_name column" trick: one dynamic
                         // transport per async transition, no manual broker setup.
+                        // No retries, deliberately. Two reasons, and the second is a landmine:
+                        //
+                        // 1. A failed transition is almost never transient. The failures we
+                        //    actually see are "the input isn't there" — a missing zip, a missing
+                        //    raw core — and retrying cannot conjure the file. Straight to the
+                        //    failure transport is both faster and more honest.
+                        //
+                        // 2. RabbitMQ 4.x REFUSES the delay queue this library declares on retry.
+                        //    jwage/phpamqplib-messenger's Connection::setupDelayQueue() calls
+                        //    queue_declare() without passing durable:, and php-amqplib defaults
+                        //    $durable=false/$exclusive=false — a transient non-exclusive queue.
+                        //    RabbitMQ 4.0 removed those, so the broker answers INTERNAL_ERROR
+                        //    ("Feature `transient_nonexcl_queues` is deprecated") and CLOSES THE
+                        //    CONNECTION. That kills messenger:consume, the restart policy brings
+                        //    it back, and the next retry kills it again: a crash loop where the
+                        //    queue never drains and nothing in the logs points at the delay queue.
+                        //    harvest hit exactly this — 7,035 restarts, 2,229 messages frozen.
+                        //    Note the main queues are fine (QueueConfig defaults durable ?? true);
+                        //    only the delay path is affected. Setting max_retries to 0 means the
+                        //    delay queue is never declared, so the bug cannot be reached.
                         'rabbitmq' => [
                             'dsn'     => self::appendPathSegment($asyncTransportDsn, $queue),
                             'options' => [
                                 'auto_setup' => true,
+                            ],
+                            'retry_strategy' => [
+                                'max_retries' => 0,
                             ],
                         ],
                         default => [
