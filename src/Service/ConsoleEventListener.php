@@ -43,7 +43,7 @@ final class ConsoleEventListener
         $input = $event->getInput();
         $output = $event->getOutput();
 
-        if ($input->hasArgument('sync') && $input->getArgument('sync')) {
+        if ($input->hasOption('sync') && $input->getOption('sync')) {
             $this->asyncQueueLocator->sync = true;
         }
 
