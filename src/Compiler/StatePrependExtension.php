@@ -175,8 +175,12 @@ final class StatePrependExtension
             // max_retries 0, which is what keeps the delay queue from ever being declared.
             // Anything dispatched with an explicit DelayStamp still hits the bug on such a
             // version — retries were never the only path to setupDelayQueue().
+            // String rather than ::class on purpose: jwage/phpamqplib-messenger is an
+            // OPTIONAL dependency of this bundle (only the rabbitmq driver needs it), so a
+            // compile-time class reference would be an unresolvable symbol for static
+            // analysis and a hard coupling we don't want.
             $delayDurableSupported = property_exists(
-                \Jwage\PhpAmqpLibMessengerBundle\Transport\Config\DelayConfig::class,
+                'Jwage\\PhpAmqpLibMessengerBundle\\Transport\\Config\\DelayConfig',
                 'durable',
             );
 
