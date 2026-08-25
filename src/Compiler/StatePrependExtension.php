@@ -28,6 +28,16 @@ final class StatePrependExtension
         // unresolved "%env(...)%" placeholder at this point in compilation, so its
         // scheme can't be relied on to pick the transport-options shape.
         $queueDriver       = 'doctrine';
+        // Symfony's own retry defaults, restated here because this pass reads RAW
+        // extension config (getExtensionConfig) and so never sees the values
+        // Configuration would have applied. Keep the two in sync with
+        // SurvosStateBundle::configure().
+        $retryStrategy     = [
+            'max_retries' => 3,
+            'delay'       => 1000,
+            'multiplier'  => 2,
+            'max_delay'   => 0,
+        ];
 
         // In load order, so LATER config wins — the same precedence the
         // Configuration processor applies. ContainerBuilder::getExtensionConfig()
@@ -44,6 +54,8 @@ final class StatePrependExtension
             if (isset($cfg['workflow_paths']))      { $workflowPaths     = (array)  $cfg['workflow_paths']; }
             if (isset($cfg['async_transport_dsn'])) { $asyncTransportDsn = (string) $cfg['async_transport_dsn']; }
             if (isset($cfg['queue_driver']))         { $queueDriver       = (string) $cfg['queue_driver']; }
+            // Merged, not replaced, so an app can override just max_retries.
+            if (isset($cfg['retry_strategy']))      { $retryStrategy     = array_merge($retryStrategy, (array) $cfg['retry_strategy']); }
         }
 
         // Published so other bundles (e.g. tabler-bundle's RabbitMqMenuSubscriber) can
@@ -139,6 +151,35 @@ final class StatePrependExtension
             $transports = [];
             $transitionToQueueMap = [];
 
+            // Can the installed jwage/phpamqplib-messenger declare a DURABLE delay queue?
+            //
+            // Its Connection::setupDelayQueue() used to call queue_declare() without passing
+            // durable:, and php-amqplib defaults $durable=false/$exclusive=false — a transient
+            // non-exclusive queue. RabbitMQ 4.0 deprecated those and 4.3 denies them by
+            // default, so the broker answers INTERNAL_ERROR and CLOSES THE CONNECTION. That
+            // kills messenger:consume, the restart policy brings it back, and the next delayed
+            // publish kills it again: a crash loop where the queue never drains and nothing in
+            // the logs points at the delay queue (harvest: 7,035 restarts, 2,229 messages
+            // frozen). The main queues are unaffected — QueueConfig defaults durable ?? true;
+            // only the delay path is.
+            //
+            // jwage/phpamqplib-messenger#124 (merged 2026-08-25, main, not yet tagged) adds an
+            // opt-in `delay.durable` option, deliberately defaulting to false so existing
+            // transient delay queues don't start failing queue_declare with PRECONDITION_FAILED.
+            // We opt in.
+            //
+            // Probed rather than assumed because the option is REJECTED outright by older
+            // versions (DelayConfig::validate() against AVAILABLE_OPTIONS), which would break
+            // every transport here rather than just the delay path. On a version without it
+            // there is no safe delayed publish at all, so we fall back to the pre-#124 shape:
+            // max_retries 0, which is what keeps the delay queue from ever being declared.
+            // Anything dispatched with an explicit DelayStamp still hits the bug on such a
+            // version — retries were never the only path to setupDelayQueue().
+            $delayDurableSupported = property_exists(
+                \Jwage\PhpAmqpLibMessengerBundle\Transport\Config\DelayConfig::class,
+                'durable',
+            );
+
             foreach ($asyncByWorkflow as $wfName => $transitions) {
                 $wfSlug = QueueNameUtil::normalizeSlug((string) $wfName);
                 foreach (array_keys($transitions) as $tName) {
@@ -151,34 +192,18 @@ final class StatePrependExtension
                         // an exchange + a same-named bound queue — the RabbitMQ analogue
                         // of Doctrine's "table + queue_name column" trick: one dynamic
                         // transport per async transition, no manual broker setup.
-                        // No retries, deliberately. Two reasons, and the second is a landmine:
                         //
-                        // 1. A failed transition is almost never transient. The failures we
-                        //    actually see are "the input isn't there" — a missing zip, a missing
-                        //    raw core — and retrying cannot conjure the file. Straight to the
-                        //    failure transport is both faster and more honest.
-                        //
-                        // 2. RabbitMQ 4.x REFUSES the delay queue this library declares on retry.
-                        //    jwage/phpamqplib-messenger's Connection::setupDelayQueue() calls
-                        //    queue_declare() without passing durable:, and php-amqplib defaults
-                        //    $durable=false/$exclusive=false — a transient non-exclusive queue.
-                        //    RabbitMQ 4.0 removed those, so the broker answers INTERNAL_ERROR
-                        //    ("Feature `transient_nonexcl_queues` is deprecated") and CLOSES THE
-                        //    CONNECTION. That kills messenger:consume, the restart policy brings
-                        //    it back, and the next retry kills it again: a crash loop where the
-                        //    queue never drains and nothing in the logs points at the delay queue.
-                        //    harvest hit exactly this — 7,035 restarts, 2,229 messages frozen.
-                        //    Note the main queues are fine (QueueConfig defaults durable ?? true);
-                        //    only the delay path is affected. Setting max_retries to 0 means the
-                        //    delay queue is never declared, so the bug cannot be reached.
+                        // `delay.durable` is what makes retries — and any DelayStamp —
+                        // survivable on RabbitMQ 4.3+; see $delayDurableSupported above for
+                        // the whole story and for what happens when it isn't available.
                         'rabbitmq' => [
                             'dsn'     => self::appendPathSegment($asyncTransportDsn, $queue),
-                            'options' => [
-                                'auto_setup' => true,
-                            ],
-                            'retry_strategy' => [
-                                'max_retries' => 0,
-                            ],
+                            'options' => $delayDurableSupported
+                                ? ['auto_setup' => true, 'delay' => ['durable' => true]]
+                                : ['auto_setup' => true],
+                            'retry_strategy' => $delayDurableSupported
+                                ? $retryStrategy
+                                : ['max_retries' => 0],
                         ],
                         default => [
                             'dsn'     => $asyncTransportDsn,
@@ -189,6 +214,7 @@ final class StatePrependExtension
 //                                'use_notify' => true, // automatic with postgres
                                 'get_notify_timeout' => 30000,
                             ],
+                            'retry_strategy' => $retryStrategy,
                         ],
                     };
                     $transitionToQueueMap[$wfSlug][$tSlug] = $queue;

@@ -285,6 +285,36 @@ final class SurvosStateBundle extends AbstractUxBundle
             // StatePrependExtension) — not inferred from async_transport_dsn's scheme,
             // since that's frequently an unresolved %env(...)% placeholder at compile time.
             ->enumNode('queue_driver')->values(['doctrine', 'rabbitmq'])->defaultValue('doctrine')->end()
+            // Retry policy applied to every dynamic per-transition transport this bundle
+            // registers (both drivers). Symfony's own defaults; override per app.
+            //
+            // These were pinned to max_retries: 0 for the whole rabbitmq era, for two
+            // reasons that are worth keeping apart now that they have come unstuck:
+            //
+            // 1. A POLICY argument, still valid: a failed transition is often not transient.
+            //    The failures we actually see are "the input isn't there" — a missing zip, a
+            //    missing raw core — and retrying cannot conjure the file; going straight to
+            //    the failure transport is faster and more honest. If that describes your
+            //    workflows, set max_retries: 0 here and keep it.
+            //
+            // 2. A BUG, now fixed: jwage/phpamqplib-messenger's delay queue crashed RabbitMQ
+            //    4.3 consumers outright, so 0 was the only safe value regardless of policy.
+            //    Fixed upstream in #124 and opted into by StatePrependExtension.
+            //
+            // The default is 3 because reason 2 was doing most of the work, and a consumer
+            // dying mid-handle — which max_retries: 0 turns into a silently lost message —
+            // is more common than an unretryable input. Note this value is ignored on a
+            // rabbitmq driver whose installed jwage version predates #124: there the delay
+            // queue is still unsafe, so 0 is forced. See $delayDurableSupported.
+            ->arrayNode('retry_strategy')
+                ->addDefaultsIfNotSet()
+                ->children()
+                    ->integerNode('max_retries')->min(0)->defaultValue(3)->end()
+                    ->integerNode('delay')->min(0)->defaultValue(1000)->end()
+                    ->floatNode('multiplier')->min(1)->defaultValue(2)->end()
+                    ->integerNode('max_delay')->min(0)->defaultValue(0)->end()
+                ->end()
+            ->end()
         ->end();
     }
 
