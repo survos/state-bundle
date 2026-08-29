@@ -1,9 +1,19 @@
+{# No workflow in this app supports the subject -- render nothing rather than throwing.
+   A bundle can ship an entity and its screen while the WORKFLOW for it lives in one
+   particular app: dataset-bundle owns DatasetInfo, but only harvest defines a
+   DatasetWorkflow for it. #}
+{% if not this.hasWorkflow %}
+{% else %}
+
 {% set marking = this.marking %}
 {% set placeMeta = this.placeMeta %}
 {% set transitions = this.transitions %}
-{% set canApply = this.globalKey and this.workflowCode %}
+{# workflowCode alone switches the buttons on; globalKey is derived from the subject when
+   not given. Passing neither still yields the read-only badge, which is what list rows
+   and search hits want. #}
+{% set canApply = this.workflowCode %}
 {% set entityId = this.entityId %}
-{% set baseParams = canApply ? {globalKey: this.globalKey, workflowCode: this.workflowCode, entityId: entityId} : {} %}
+{% set baseParams = canApply ? {globalKey: this.resolvedGlobalKey, workflowCode: this.workflowCode, entityId: entityId} : {} %}
 {% set applyParams = (this.redirectUrl and canApply) ? baseParams|merge({redirectUrl: this.redirectUrl}) : baseParams %}
 {% set enabled = transitions|filter(t => t.enabled) %}
 {% set blocked = transitions|filter(t => not t.enabled) %}
@@ -39,6 +49,55 @@
     </span>
 {% endmacro %}
 
+{# The place sequence, current one filled. Read without meaning to, which is the point:
+   "where am I in this thing" is the question you have four screens into a session, and a
+   badge alone answers it only if you already hold the whole workflow in your head. #}
+{% macro steps(places) %}
+    <div class="d-flex align-items-center gap-1 flex-wrap">
+        {% for p in places %}
+            <span class="badge rounded-pill text-capitalize px-2 {{ p.current ? ('text-bg-' ~ p.bgColor) : 'text-bg-light border text-muted' }}"
+                  style="font-size:.625rem;"
+                  {% if p.info %}data-bs-toggle="tooltip" data-bs-placement="top" title="{{ p.info }}"{% endif %}>
+                {% if p.current %}▶ {% endif %}{{ p.label }}
+            </span>
+            {# Only where a transition really connects the two -- see getPlaces(). #}
+            {% if p.flowsToNext %}<span class="text-muted small">→</span>
+            {% elseif not loop.last %}<span class="text-muted small opacity-25">·</span>{% endif %}
+        {% endfor %}
+    </div>
+{% endmacro %}
+
+{# Force-place: set the marking directly, running nothing.
+
+   Visually separated from the transition buttons on purpose -- it is not one of them.
+   Those move an entity the way the workflow says it may move; this one overrules the
+   workflow, so side effects a transition would have performed have not happened and the
+   marking can now disagree with the entity's data. Debug-only by default; see the
+   bundle's allow_force_place. #}
+{% macro force_place(applyParams, places, marking) %}
+    <div class="btn-group" role="group">
+        <button type="button" class="btn btn-sm btn-outline-warning dropdown-toggle"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                title="Set the marking directly. Runs no transition and no guard.">
+            ⚡ Force
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li><h6 class="dropdown-header">Set marking — runs nothing</h6></li>
+            {% for p in places %}
+                <li>
+                    <form method="post" action="{{ path('survos_state_debug_apply', applyParams|merge({transition: '_force_place'})) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('survos_state_apply') }}">
+                        <input type="hidden" name="place" value="{{ p.name }}">
+                        <button type="submit" class="dropdown-item{{ p.current ? ' active' : '' }}"{{ p.current ? ' disabled' : '' }}>
+                            {{ p.label }}{% if p.current %} <span class="text-muted small">(current)</span>{% endif %}
+                        </button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endmacro %}
+
 {% import _self as w %}
 
 {# ── badge-only (no transitions) ─────────────────────────────────────── #}
@@ -48,6 +107,8 @@
 
 {# ── inline: place badge + action buttons ────────────────────────────── #}
 {% elseif this.layout == 'inline' %}
+
+    {% if this.showSteps %}{{ w.steps(this.places) }}{% endif %}
 
     <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="badge text-bg-{{ placeMeta.bgColor ?? 'secondary' }} fs-6 font-monospace">{{ marking }}</span>
@@ -90,12 +151,20 @@
             {% endif %}
         {% endfor %}
 
-        {% if this.showBlocked %}
+        {# Gated on canApply, not just showBlocked: without an apply route the whole widget
+           is informational, and a row of disabled buttons that were never clickable is
+           noise -- this component also renders once per hit in search result grids. #}
+        {% if this.showBlocked and canApply %}
             {% for t in blocked %}{{ w.blocked_button(t, 'sm') }}{% endfor %}
         {% endif %}
 
-        {% if enabled is empty and (not this.showBlocked or blocked is empty) %}
+        {% if enabled is empty and (not (this.showBlocked and canApply) or blocked is empty) %}
             <span class="text-muted small">no transitions available</span>
+        {% endif %}
+
+        {% if canApply and this.forcePlaceEnabled %}
+            <span class="vr mx-1"></span>
+            {{ w.force_place(applyParams, this.places, marking) }}
         {% endif %}
     </div>
 
@@ -103,10 +172,14 @@
 {% else %}
 
     <div class="d-flex flex-column gap-3">
+        {% if this.showSteps %}{{ w.steps(this.places) }}{% endif %}
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="badge text-bg-{{ placeMeta.bgColor ?? 'secondary' }} fs-6 font-monospace">{{ marking }}</span>
             {% if placeMeta.label is defined %}<strong>{{ placeMeta.label }}</strong>{% endif %}
             {% if placeMeta.description is defined %}<span class="text-muted small">— {{ placeMeta.description }}</span>{% endif %}
+            {% if canApply and this.forcePlaceEnabled %}
+                <span class="ms-auto">{{ w.force_place(applyParams, this.places, marking) }}</span>
+            {% endif %}
         </div>
 
         {# Summary of all pending steps grouped by phase #}
@@ -169,7 +242,10 @@
 
 {% endif %}
 
-{% if canApply %}
+{# Only where there is something for it to do: apply spinners, or the tooltips that the
+   step strip and the blocked buttons depend on. A badge-only render needs neither, and
+   this component appears once per hit in a search grid. #}
+{% if canApply or this.showSteps %}
 <script>
     (function () {
         document.querySelectorAll('.apply-form').forEach(form => {
@@ -188,4 +264,6 @@
         });
     })();
 </script>
+{% endif %}
+
 {% endif %}

@@ -9,6 +9,16 @@ Older apps may still use `*WF`, `*WorkflowInterface`, or a single class that bot
 
 auto-registration!
 
+## Docs
+
+- **[Putting a workflow on screen](docs/workflow-ui.md)** — the
+  `<twig:state:workflow-marking>` component: place strip, transition buttons,
+  why a transition is blocked, running an async transition synchronously, and
+  the dev-only force-place control. Start here if you are debugging a workflow.
+- [Adding a workflow to an app](docs/adding-a-workflow.md) — the definition +
+  listener split, and the parts that are not obvious from the attributes.
+- [DynamicRoutingMiddleware](docs/DynamicRoutingMiddleware.md)
+
 ## Workflow Constants In Twig
 
 The bundle now exposes additive Twig helpers for resolving workflow definition constants without hard-coding raw place or transition strings in templates.

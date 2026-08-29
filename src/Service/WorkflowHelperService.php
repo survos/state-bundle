@@ -423,10 +423,16 @@ class WorkflowHelperService
      */
     public function classFromGlobalKey(string $globalKey): string
     {
-        foreach ($this->entityManager->getMetadataFactory()->getAllMetadata() as $meta) {
-            $computed = u(ltrim($meta->getName(), '\\'))->replace('\\', '_')->snake()->upper()->toString();
-            if ($computed === $globalKey) {
-                return $meta->getName();
+        // EVERY manager, not just the default. dataset-bundle's DatasetInfo lives on its
+        // own `dataset` registry, so against the default manager it is simply absent and
+        // the failure reads as "no entity class found" -- which sounds like a malformed
+        // key rather than the right key looked up on the wrong connection.
+        foreach ($this->managerRegistry->getManagers() as $manager) {
+            foreach ($manager->getMetadataFactory()->getAllMetadata() as $meta) {
+                $computed = u(ltrim($meta->getName(), '\\'))->replace('\\', '_')->snake()->upper()->toString();
+                if ($computed === $globalKey) {
+                    return $meta->getName();
+                }
             }
         }
 

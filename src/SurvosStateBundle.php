@@ -267,6 +267,7 @@ final class SurvosStateBundle extends AbstractUxBundle
 
 
         $builder->setParameter('survos_state.entity_paths', $config['workflow_paths'] ?? ['%kernel.project_dir%/src/Workflow']);
+        $builder->setParameter('survos_state.allow_force_place', $config['allow_force_place'] ?? '%kernel.debug%');
     }
 
     public function configure(DefinitionConfigurator $definition): void
@@ -278,6 +279,16 @@ final class SurvosStateBundle extends AbstractUxBundle
             ->scalarNode('queue_prefix')->defaultValue('')->end()
             ->scalarNode('base_layout')->defaultValue('base.html.twig')->end()
             ->booleanNode('enable_dynamic_routing')->defaultValue(true)->end()
+            // Force-place: set a marking directly, running no transition and no guard.
+            //
+            // Debug-only by default, and that default is the recommendation. It is the
+            // one control here that can put an entity somewhere the workflow says it
+            // cannot be -- which is exactly why it is useful (re-run triage on an
+            // already-triaged image without a manual UPDATE) and exactly why it should
+            // not be a button a tired operator can reach on a Friday afternoon. If you
+            // do enable it in production, gate the surrounding template on a role too;
+            // this flag is a kill switch, not an authorization system.
+            ->scalarNode('allow_force_place')->defaultValue('%kernel.debug%')->end()
             ->arrayNode('workflow_paths')->prototype('scalar')->end()
             ->defaultValue(['%kernel.project_dir%/src/Workflow'])->end()
             ->scalarNode('async_transport_dsn')->defaultValue('doctrine://default')->end()

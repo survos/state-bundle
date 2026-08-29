@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Survos\StateBundle\Controller;
 
-use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use Survos\StateBundle\Message\TransitionMessage;
 use Survos\StateBundle\Service\AsyncQueueLocator;
 use Survos\StateBundle\Service\WorkflowHelperService;
@@ -15,6 +15,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapQueryParameter;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Workflow\WorkflowInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Security\Http\Attribute\IsCsrfTokenValid;
 
 class TransitionDebugController extends AbstractController
@@ -22,14 +24,26 @@ class TransitionDebugController extends AbstractController
     /** Token id for the apply form; the entity id is folded in so one page's token can't fire another's. */
     public const APPLY_CSRF_ID = 'survos_state_apply';
 
+    /** Pseudo-transition: put the marking somewhere directly, running nothing. */
+    public const FORCE_PLACE = '_force_place';
+
+    /** Pseudo-transition: back to the workflow's initial place, running nothing. */
+    public const HARD_RESET = '_hard_reset';
+
     public function __construct(
-        private readonly EntityManagerInterface $entityManager,
+        private readonly ManagerRegistry $managerRegistry,
         private readonly WorkflowHelperService $workflowHelperService,
         private readonly AsyncQueueLocator $asyncQueueLocator,
         private readonly MessageBusInterface $bus,
+        #[Autowire('%survos_state.allow_force_place%')] private readonly bool $allowForcePlace = false,
     ) {}
 
-    #[Route('/debug/{globalKey}/{workflowCode}/{entityId}', name: 'survos_state_debug_transitions', methods: ['GET'])]
+    // entityId is greedy and LAST on both routes. An entity's primary key is allowed to
+    // contain a slash -- dataset-bundle's DatasetInfo is keyed by "nara/rg_105" -- and
+    // with entityId in the middle of the path there is no requirement that can express
+    // that without also swallowing the segment after it. Putting the transition first
+    // costs nothing: transition names never contain a slash.
+    #[Route('/debug/{globalKey}/{workflowCode}/{entityId}', name: 'survos_state_debug_transitions', methods: ['GET'], requirements: ['entityId' => '.+'])]
     public function debug(
         string $globalKey,
         string $workflowCode,
@@ -97,7 +111,7 @@ class TransitionDebugController extends AbstractController
      *              run would take is the code path you are debugging).
      *   reset      put the marking back to the initial place, running nothing.
      */
-    #[Route('/debug/{globalKey}/{workflowCode}/{entityId}/{transition}', name: 'survos_state_debug_apply', methods: ['POST'])]
+    #[Route('/debug/{globalKey}/{workflowCode}/t/{transition}/{entityId}', name: 'survos_state_debug_apply', methods: ['POST'], requirements: ['entityId' => '.+'], priority: 10)]
     #[IsCsrfTokenValid(self::APPLY_CSRF_ID, tokenKey: '_token')]
     public function apply(
         Request $request,
@@ -111,12 +125,28 @@ class TransitionDebugController extends AbstractController
         $workflow = $this->workflowHelperService->getWorkflowByCode($workflowCode);
         $mode     = (string) $request->request->get('mode', '');
 
-        if ($transition === '_hard_reset' || $mode === 'reset') {
-            $entity->setMarking($workflow->getDefinition()->getInitialPlaces()[0]);
-            $this->entityManager->flush();
-            $this->addFlash('warning', 'Marking reset to initial place.');
+        if ($transition === self::HARD_RESET || $mode === 'reset') {
+            return $this->forcePlace(
+                $entity,
+                $workflow->getDefinition()->getInitialPlaces()[0],
+                $workflow,
+                $globalKey,
+                $workflowCode,
+                $entityId,
+                $redirectUrl,
+            );
+        }
 
-            return $this->back($globalKey, $workflowCode, $entityId, $redirectUrl);
+        if ($transition === self::FORCE_PLACE) {
+            return $this->forcePlace(
+                $entity,
+                (string) $request->request->get('place', ''),
+                $workflow,
+                $globalKey,
+                $workflowCode,
+                $entityId,
+                $redirectUrl,
+            );
         }
 
         if (!$workflow->can($entity, $transition)) {
@@ -154,12 +184,71 @@ class TransitionDebugController extends AbstractController
         return $this->back($globalKey, $workflowCode, $entityId, $redirectUrl);
     }
 
+    /**
+     * Sets the marking directly. No transition fires, so no guard runs and no listener
+     * sees it -- the entity simply IS somewhere else now.
+     *
+     * That is the whole value (re-run triage on an already-triaged image without a
+     * manual UPDATE, park an entity mid-pipeline to reproduce a bug) and the whole
+     * danger: side effects a transition would have performed have not happened, so the
+     * marking can now disagree with the entity's actual data. Debug-only by default,
+     * see the bundle's allow_force_place.
+     *
+     * The place is checked against the definition rather than trusted, so this cannot
+     * write a marking the workflow has never heard of -- that state would be
+     * unrecoverable through the UI, since every transition's `from` would miss it.
+     */
+    private function forcePlace(
+        MarkingInterface $entity,
+        string $place,
+        WorkflowInterface $workflow,
+        string $globalKey,
+        string $workflowCode,
+        int|string $entityId,
+        ?string $redirectUrl,
+    ): Response {
+        if (!$this->allowForcePlace) {
+            throw $this->createAccessDeniedException('Forcing a marking is disabled (survos_state.allow_force_place).');
+        }
+
+        $places = $workflow->getDefinition()->getPlaces();
+        if (!in_array($place, $places, true)) {
+            $this->addFlash('danger', sprintf(
+                'Unknown place "%s". Known: %s',
+                $place,
+                implode(', ', $places),
+            ));
+
+            return $this->back($globalKey, $workflowCode, $entityId, $redirectUrl);
+        }
+
+        $from = $entity->getMarking();
+        $entity->setMarking($place);
+        $this->managerRegistry->getManagerForClass($entity::class)?->flush();
+
+        $this->addFlash('warning', sprintf('Marking forced %s → %s. No transition ran.', $from ?? '(none)', $place));
+
+        return $this->back($globalKey, $workflowCode, $entityId, $redirectUrl);
+    }
+
+    /**
+     * Loaded from the manager that maps the class, not the default one. Entities on a
+     * secondary EM are not exotic -- harvest's DatasetInfo lives on its own `dataset`
+     * registry -- and against the default manager they simply come back as "not found",
+     * which reads like a bad id rather than a wrong connection. WorkflowHelperService's
+     * own message handler already resolves the manager this way.
+     */
     private function loadEntity(string $globalKey, int|string $entityId): MarkingInterface
     {
         $class = $this->workflowHelperService->classFromGlobalKey($globalKey);
 
+        $em = $this->managerRegistry->getManagerForClass($class);
+        if ($em === null) {
+            throw $this->createNotFoundException("$class is not managed by any entity manager.");
+        }
+
         /** @var ?MarkingInterface $entity */
-        $entity = $this->entityManager->getRepository($class)->find($entityId);
+        $entity = $em->getRepository($class)->find($entityId);
         if (!$entity) {
             throw $this->createNotFoundException("$class #$entityId not found.");
         }
