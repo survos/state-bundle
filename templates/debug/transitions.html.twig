@@ -13,11 +13,11 @@
             <h1 class="h4 mb-1">{{ workflowCode }} — {{ class|split('\\')|last }} #{{ entityId }}</h1>
             <div class="text-muted small font-monospace">{{ class }}</div>
         </div>
-        <a href="{{ path('survos_state_debug_apply', applyParams|merge({transition: '_hard_reset'})) }}"
-           class="btn btn-sm btn-outline-danger"
-           onclick="return confirm('Reset marking to initial place?')">
-            Hard Reset
-        </a>
+        <form method="post" action="{{ path('survos_state_debug_apply', applyParams|merge({transition: '_hard_reset'})) }}"
+              onsubmit="return confirm('Reset marking to initial place?')">
+            <input type="hidden" name="_token" value="{{ csrf_token('survos_state_apply') }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger">Hard Reset</button>
+        </form>
     </div>
 
     {# ── flashes ─────────────────────────────────────────────────────── #}
@@ -55,7 +55,7 @@
         <strong>Pending steps ({{ entity.allPendingSteps|length }}):</strong>
         {% for phase, steps in entity.pendingSteps %}{% for step in steps %}
             <span class="badge text-bg-warning font-monospace">{{ step }}</span>
-        {% endfor %}
+        {% endfor %}{% endfor %}
         <span class="text-muted small ms-1">(guard blocks advance until all steps are consumed)</span>
     </div>
     {% endif %}
@@ -99,17 +99,31 @@
                 </td>
                 <td>
                     {% if t.enabled %}
-                        <a href="{{ path('survos_state_debug_apply', applyParams|merge({transition: t.name})) }}"
-                           class="btn btn-sm btn-primary text-nowrap apply-btn">
-                            <span class="apply-label">Apply</span>
-                            <span class="apply-spinner d-none spinner-border spinner-border-sm" role="status"></span>
-                        </a>
+                        {# POST, not a link: the apply route mutates the entity, so it must not
+                           be reachable by a prefetch or a crawler. #}
+                        <form method="post" class="d-inline apply-form"
+                              action="{{ path('survos_state_debug_apply', applyParams|merge({transition: t.name})) }}">
+                            <input type="hidden" name="_token" value="{{ csrf_token('survos_state_apply') }}">
+                            <button type="submit" class="btn btn-sm btn-primary text-nowrap">
+                                <span class="apply-label">{{ t.async ? 'Queue' : 'Apply' }}</span>
+                                <span class="apply-spinner d-none spinner-border spinner-border-sm" role="status"></span>
+                            </button>
+                        </form>
+                        {% if t.async %}
+                            <form method="post" class="d-inline apply-form"
+                                  action="{{ path('survos_state_debug_apply', applyParams|merge({transition: t.name})) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('survos_state_apply') }}">
+                                <input type="hidden" name="mode" value="sync">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap"
+                                        title="Run now, inline, through the real handler">Sync</button>
+                            </form>
+                        {% endif %}
                     {% elseif t.meta.guard is defined %}
                         <span class="text-muted small font-monospace" title="{{ t.meta.guard }}">guarded</span>
                         {% if entity.allPendingSteps is defined and entity.allPendingSteps is not empty %}
                             {% for phase, steps in entity.pendingSteps %}{% for step in steps %}
                                 <span class="badge text-bg-warning font-monospace">{{ step }}</span>
-                            {% endfor %}
+                            {% endfor %}{% endfor %}
                         {% endif %}
                     {% endif %}
                 </td>
@@ -124,11 +138,13 @@
 {% block javascripts %}
     {{ parent() }}
     <script>
-        document.querySelectorAll('.apply-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+        document.querySelectorAll('.apply-form').forEach(form => {
+            form.addEventListener('submit', () => {
+                const btn = form.querySelector('button[type=submit]');
+                if (!btn) return;
                 btn.classList.add('disabled');
-                btn.querySelector('.apply-label').classList.add('d-none');
-                btn.querySelector('.apply-spinner').classList.remove('d-none');
+                btn.querySelector('.apply-label')?.classList.add('d-none');
+                btn.querySelector('.apply-spinner')?.classList.remove('d-none');
             });
         });
     </script>

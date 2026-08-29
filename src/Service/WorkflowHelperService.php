@@ -402,8 +402,19 @@ class WorkflowHelperService
 
     public function getWorkflowByCode(string $code)
     {
-        assert(array_key_exists($code, $this->getWorkflowsIndexedByName()), "Unknown workflow: $code");
-        return $this->getWorkflowsIndexedByName()[$code];
+        $workflows = $this->getWorkflowsIndexedByName();
+        // Not assert(): assertions are compiled out under production's
+        // zend.assertions=-1, so a bad code returned an undefined-index null there and
+        // failed somewhere further along with no mention of the workflow name.
+        if (!array_key_exists($code, $workflows)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Unknown workflow "%s". Known: %s',
+                $code,
+                implode(', ', array_keys($workflows)) ?: '(none)',
+            ));
+        }
+
+        return $workflows[$code];
     }
 
     /**

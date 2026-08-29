@@ -2,18 +2,51 @@
 {% set placeMeta = this.placeMeta %}
 {% set transitions = this.transitions %}
 {% set canApply = this.globalKey and this.workflowCode %}
-{% set entityId = subject.erp.entityId %}
+{% set entityId = this.entityId %}
 {% set baseParams = canApply ? {globalKey: this.globalKey, workflowCode: this.workflowCode, entityId: entityId} : {} %}
 {% set applyParams = (this.redirectUrl and canApply) ? baseParams|merge({redirectUrl: this.redirectUrl}) : baseParams %}
 {% set enabled = transitions|filter(t => t.enabled) %}
 {% set blocked = transitions|filter(t => not t.enabled) %}
+
+{# One button = one form. This was an <a href> until the apply route was locked down to
+   POST + CSRF: a GET link that moves an entity through its workflow is something a link
+   prefetcher or a crawler can fire on its own.
+
+   `mode` is what the async split-button sets — empty means "route it the way the workflow
+   says", sync means "run it now, through the real handler, so I can watch it". #}
+{% macro apply_form(applyParams, t, mode, cls, label, title, disabled) %}
+    <form method="post" action="{{ path('survos_state_debug_apply', applyParams|merge({transition: t.name})) }}"
+          class="d-inline apply-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('survos_state_apply') }}">
+        {% if mode %}<input type="hidden" name="mode" value="{{ mode }}">{% endif %}
+        <button type="submit" class="{{ cls }}" title="{{ title }}"{{ disabled ? ' disabled' : '' }}>
+            <span class="apply-label">{{ label }}</span>
+            <span class="apply-spinner d-none spinner-border spinner-border-sm" role="status"></span>
+        </button>
+    </form>
+{% endmacro %}
+
+{# A blocked transition renders as a real, dimmed button rather than being hidden. Hiding
+   it answers "what can I do now"; showing it dimmed also answers "what comes next, and
+   what is standing in the way" — which is the question you have when the button you
+   wanted is the one that isn't there. The tooltip is the guards' own wording. #}
+{% macro blocked_button(t, size) %}
+    {% set why = t.blockers|length ? t.blockers|join(' · ') : (t.guard ?: 'Not available from the current place.') %}
+    <span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" title="{{ why }}">
+        <button type="button" class="btn btn-{{ size }} btn-outline-secondary opacity-50" disabled style="pointer-events:none;">
+            {{ t.label }}
+        </button>
+    </span>
+{% endmacro %}
+
+{% import _self as w %}
 
 {# ── badge-only (no transitions) ─────────────────────────────────────── #}
 {% if not showTransitions %}
 
     <span class="badge text-bg-{{ placeMeta.bgColor ?? 'secondary' }} text-uppercase">{{ marking }}</span>
 
-{# ── inline: place badge + available action buttons ──────────────────── #}
+{# ── inline: place badge + action buttons ────────────────────────────── #}
 {% elseif this.layout == 'inline' %}
 
     <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -28,18 +61,40 @@
                 {% endif %}
             {% endfor %}
         {% endif %}
+
         {% for t in enabled %}
-            {% if canApply %}
-                <a href="{{ path('survos_state_debug_apply', applyParams|merge({transition: t.name})) }}"
-                   class="btn btn-sm btn-primary apply-btn" title="{{ t.description }}">
-                    <span class="apply-label">{{ t.label }}</span>
-                    <span class="apply-spinner d-none spinner-border spinner-border-sm" role="status"></span>
-                </a>
-            {% else %}
+            {% if not canApply %}
                 <span class="badge text-bg-primary">→ {{ t.label }}</span>
+            {% elseif t.async %}
+                {# Split button: the main half queues it (what production does), the caret
+                   offers the same transition run inline so a failure surfaces here instead
+                   of in a worker log. #}
+                <div class="btn-group" role="group">
+                    {{ w.apply_form(applyParams, t, null, 'btn btn-sm btn-primary', t.label ~ ' ⏱', t.description ~ ' (queued)', false) }}
+                    <button type="button" class="btn btn-sm btn-primary dropdown-toggle dropdown-toggle-split"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="visually-hidden">More options for {{ t.label }}</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <form method="post" action="{{ path('survos_state_debug_apply', applyParams|merge({transition: t.name})) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('survos_state_apply') }}">
+                                <input type="hidden" name="mode" value="sync">
+                                <button type="submit" class="dropdown-item">Run now (sync)</button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            {% else %}
+                {{ w.apply_form(applyParams, t, null, 'btn btn-sm btn-primary', t.label, t.description, false) }}
             {% endif %}
         {% endfor %}
-        {% if enabled is empty %}
+
+        {% if this.showBlocked %}
+            {% for t in blocked %}{{ w.blocked_button(t, 'sm') }}{% endfor %}
+        {% endif %}
+
+        {% if enabled is empty and (not this.showBlocked or blocked is empty) %}
             <span class="text-muted small">no transitions available</span>
         {% endif %}
     </div>
@@ -75,9 +130,16 @@
             <tbody>
             {% for t in transitions %}
                 <tr class="{{ t.enabled ? 'table-success' : 'text-muted' }}">
-                    <td class="font-monospace fw-semibold">{{ t.name }}</td>
+                    <td class="font-monospace fw-semibold">
+                        {{ t.name }}
+                        {% if t.async %}<span class="badge text-bg-info ms-1" title="Queued to a worker">async</span>{% endif %}
+                    </td>
                     <td class="small">
                         {{ t.description }}
+                        {# The guards' own reason, shown without a click. #}
+                        {% if not t.enabled and t.blockers|length %}
+                            <div class="mt-1 text-danger small">{{ t.blockers|join(' · ') }}</div>
+                        {% endif %}
                         {# Show pending steps queued for this specific transition #}
                         {% set phasePending = subject.pendingSteps[t.name] ?? [] %}
                         {% if phasePending|length > 0 %}
@@ -89,15 +151,14 @@
                             </div>
                         {% endif %}
                     </td>
-                    <td>
+                    <td class="text-nowrap">
                         {% if t.enabled and canApply %}
-                            <a href="{{ path('survos_state_debug_apply', applyParams|merge({transition: t.name})) }}"
-                               class="btn btn-sm btn-primary apply-btn">
-                                <span class="apply-label">Apply</span>
-                                <span class="apply-spinner d-none spinner-border spinner-border-sm" role="status"></span>
-                            </a>
-                        {% elseif t.guard %}
-                            <span class="badge text-bg-light border text-muted font-monospace small" title="{{ t.guard }}">guarded</span>
+                            {{ w.apply_form(applyParams, t, null, 'btn btn-sm btn-primary', t.async ? 'Queue' : 'Apply', t.description, false) }}
+                            {% if t.async %}
+                                {{ w.apply_form(applyParams, t, 'sync', 'btn btn-sm btn-outline-secondary ms-1', 'Sync', 'Run now, inline, through the real handler', false) }}
+                            {% endif %}
+                        {% elseif not t.enabled %}
+                            {{ w.blocked_button(t, 'sm') }}
                         {% endif %}
                     </td>
                 </tr>
@@ -110,12 +171,21 @@
 
 {% if canApply %}
 <script>
-    document.querySelectorAll('.apply-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            btn.classList.add('disabled');
-            btn.querySelector('.apply-label').classList.add('d-none');
-            btn.querySelector('.apply-spinner').classList.remove('d-none');
+    (function () {
+        document.querySelectorAll('.apply-form').forEach(form => {
+            form.addEventListener('submit', () => {
+                const btn = form.querySelector('button[type=submit]');
+                if (!btn) return;
+                btn.classList.add('disabled');
+                btn.querySelector('.apply-label')?.classList.add('d-none');
+                btn.querySelector('.apply-spinner')?.classList.remove('d-none');
+            });
         });
-    });
+        // Tooltips are opt-in in Bootstrap 5, and the blocked buttons are useless without
+        // them -- the reason IS the tooltip.
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+            if (window.bootstrap?.Tooltip) bootstrap.Tooltip.getOrCreateInstance(el);
+        });
+    })();
 </script>
 {% endif %}

@@ -30,7 +30,12 @@ trait HandleTransitionsTrait
         // use message handler instead.
         $suffix = '_async';
         if (u($transition)->endsWith($suffix) && $bus) {
-            $tName = trim($transition, $suffix);
+            // NOT trim($transition, $suffix): trim's second argument is a character
+            // LIST, not a suffix, so it strips any of _ a s y n c from both ends.
+            // 'enrich_async' survived that by luck; 'scan_async' came out as '' --
+            // every letter of "scan" is in "_async" -- and dispatched a nameless
+            // transition. u()->beforeLast() removes the actual suffix.
+            $tName = (string) u($transition)->beforeLast($suffix);
 
             //            $transitions  = $workflow->getDefinition()->getTransitions();
             //            $t = current(array_filter($transitions , fn(Transition $transition) => $transition->getName() === $tName));
