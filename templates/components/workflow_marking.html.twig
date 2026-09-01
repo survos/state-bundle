@@ -1,23 +1,7 @@
-{# No workflow in this app supports the subject -- render nothing rather than throwing.
-   A bundle can ship an entity and its screen while the WORKFLOW for it lives in one
-   particular app: dataset-bundle owns DatasetInfo, but only harvest defines a
-   DatasetWorkflow for it. #}
-{% if not this.hasWorkflow %}
-{% else %}
-
-{% set marking = this.marking %}
-{% set placeMeta = this.placeMeta %}
-{% set transitions = this.transitions %}
-{# workflowCode alone switches the buttons on; globalKey is derived from the subject when
-   not given. Passing neither still yields the read-only badge, which is what list rows
-   and search hits want. #}
-{% set canApply = this.workflowCode %}
-{% set entityId = this.entityId %}
-{% set baseParams = canApply ? {globalKey: this.resolvedGlobalKey, workflowCode: this.workflowCode, entityId: entityId} : {} %}
-{% set applyParams = (this.redirectUrl and canApply) ? baseParams|merge({redirectUrl: this.redirectUrl}) : baseParams %}
-{% set enabled = transitions|filter(t => t.enabled) %}
-{% set blocked = transitions|filter(t => not t.enabled) %}
-
+{# Macros live at the root of the template, not inside the hasWorkflow guard.
+   Twig 3.27 deprecates defining a macro anywhere else, and a bundle template that
+   emits four deprecations per render fills a deploy log with them -- which is how
+   this surfaced, in a docker build's output rather than in anyone's browser. #}
 {# One button = one form. This was an <a href> until the apply route was locked down to
    POST + CSRF: a GET link that moves an entity through its workflow is something a link
    prefetcher or a crawler can fire on its own.
@@ -99,6 +83,25 @@
 {% endmacro %}
 
 {% import _self as w %}
+
+{# No workflow in this app supports the subject -- render nothing rather than throwing.
+   A bundle can ship an entity and its screen while the WORKFLOW for it lives in one
+   particular app: dataset-bundle owns DatasetInfo, but only harvest defines a
+   DatasetWorkflow for it. #}
+{% if this.hasWorkflow %}
+
+{% set marking = this.marking %}
+{% set placeMeta = this.placeMeta %}
+{% set transitions = this.transitions %}
+{# workflowCode alone switches the buttons on; globalKey is derived from the subject when
+   not given. Passing neither still yields the read-only badge, which is what list rows
+   and search hits want. #}
+{% set canApply = this.workflowCode %}
+{% set entityId = this.entityId %}
+{% set baseParams = canApply ? {globalKey: this.resolvedGlobalKey, workflowCode: this.workflowCode, entityId: entityId} : {} %}
+{% set applyParams = (this.redirectUrl and canApply) ? baseParams|merge({redirectUrl: this.redirectUrl}) : baseParams %}
+{% set enabled = transitions|filter(t => t.enabled) %}
+{% set blocked = transitions|filter(t => not t.enabled) %}
 
 {# ── badge-only (no transitions) ─────────────────────────────────────── #}
 {% if not showTransitions %}
