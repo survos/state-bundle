@@ -153,7 +153,25 @@ final class InitialPlaceKickoffListener
     private function workflowFor(object $entity): ?WorkflowInterface
     {
         $class = \Doctrine\Common\Util\ClassUtils::getRealClass($entity::class);
-        $name  = $this->workflowHelperService->getWorkflowsGroupedByClass()[$class][0] ?? null;
+        $byClass = $this->workflowHelperService->getWorkflowsGroupedByClass();
+        $name = $byClass[$class][0] ?? null;
+
+        // Fall back to an instanceof match, because that is what actually decides whether the
+        // workflow applies: Symfony resolves `supports` through InstanceOfSupportStrategy. Keying
+        // only on the exact class made this listener STRICTER than the workflow it is starting —
+        // a workflow declared `supports: [BaseMedia::class]` runs happily on a Photo row when you
+        // ask it to, but the kickoff looked up 'Photo', missed, and returned null. The row was
+        // then persisted at its initial place and simply sat there: no message, no error, no log
+        // line, since a null workflow is also the ordinary "this entity has no workflow" answer.
+        if ($name === null) {
+            foreach ($byClass as $supported => $names) {
+                if (is_a($class, $supported, true)) {
+                    $name = $names[0] ?? null;
+                    break;
+                }
+            }
+        }
+
         if ($name === null) {
             return null;
         }
