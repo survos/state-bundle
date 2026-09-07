@@ -3,7 +3,6 @@
 namespace Survos\StateBundle\Command;
 
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Survos\FieldBundle\Repository\QueryBuilderHelperInterface;
@@ -127,8 +126,6 @@ final class IterateCommand
         $qb = $entityManager->createQueryBuilder()
             ->select('e')
             ->from($className, 'e');
-//        $this->applyFilters($qb, $filters);
-//        $count = $this->getCount($qb);
 
         // Determine workflow (if any) for this class
         $workflow = null;
@@ -520,6 +517,24 @@ final class IterateCommand
                 continue;
             }
 
+            // A %-delimited value means LIKE. --filter is documented as urlQuerystring style
+            // and this was always the intent: a second private applyFilters() implemented
+            // exactly this and was never called -- its only call site sat commented out -- so a
+            // value like `originalUrl=%clevelandart%` compiled to an exact `=` against the
+            // literal string "%clevelandart%" and matched nothing. That dead copy has been
+            // deleted; this is now the one and only filter applier.
+            //
+            // The silent part is what made it expensive: iterate then reports
+            // "No items found for filter", which reads as "your data is wrong" rather than
+            // "your operator was ignored" -- against a dataset that demonstrably had 24 matching
+            // rows. Keep the wildcard branch ahead of the exact-match fallback so the documented
+            // syntax and the executed query cannot drift apart again.
+            if (is_string($value) && (str_starts_with($value, '%') || str_ends_with($value, '%'))) {
+                $qb->andWhere(sprintf('e.%s LIKE :%s', $field, $parameter));
+                $qb->setParameter($parameter, $value);
+                continue;
+            }
+
             if (is_array($value)) {
                 $qb->andWhere(sprintf('e.%s IN (:%s)', $field, $parameter));
             } else {
@@ -537,51 +552,6 @@ final class IterateCommand
 
         parse_str($filterString, $filters);
         return $filters;
-    }
-
-    private function applyFilters($qb, array $filters): void
-    {
-        foreach ($filters as $field => $value) {
-            // Handle different operators
-            if (str_contains($value, ',')) {
-                // IN operator: gender=male,female
-                $values = explode(',', $value);
-                $qb->andWhere("e.$field IN (:$field)")
-                    ->setParameter($field, $values);
-            } elseif (str_starts_with($value, '%') || str_ends_with($value, '%')) {
-                // LIKE operator: name=%Bob%
-                $qb->andWhere("e.$field LIKE :$field")
-                    ->setParameter($field, $value);
-            } elseif ($value === 'null') {
-                // IS NULL: field=null
-                $qb->andWhere("e.$field IS NULL");
-            } elseif ($value === '!null') {
-                // IS NOT NULL: field=!null
-                $qb->andWhere("e.$field IS NOT NULL");
-            } else {
-                // Exact match
-                $qb->andWhere("e.$field = :$field")
-                    ->setParameter($field, $value);
-            }
-        }
-    }
-
-    private function getCount(QueryBuilder $qb): int
-    {
-        // Clone to avoid modifying the original
-        $countQb = clone $qb;
-
-        // Reset select and get count
-        $countQb->select('COUNT(e.id)');
-
-        // Remove ordering (not needed for count and can slow it down)
-        $countQb->resetDQLPart('orderBy');
-
-        // Remove limit/offset for accurate total count
-        $countQb->setFirstResult(null);
-        $countQb->setMaxResults(null);
-
-        return (int) $countQb->getQuery()->getSingleScalarResult();
     }
 
     private function getManagerForClass(string $className): EntityManagerInterface
