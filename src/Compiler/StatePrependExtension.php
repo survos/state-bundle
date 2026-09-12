@@ -97,6 +97,7 @@ final class StatePrependExtension
 
         // 2) Collect async transitions (+ seed initialTransitions safely)
         $asyncByWorkflow    = [];
+        $batchByWorkflow    = []; // #[Transition(batch: N)] → [workflow][transition] => N
         $initialTransitions = []; // ✅ CRITICAL: initialize!
 
         if (!empty($built['async_by_workflow']) && is_array($built['async_by_workflow'])) {
@@ -127,6 +128,9 @@ final class StatePrependExtension
                     if (($t['metadata']['async'] ?? false) === true) {
                         $asyncByWorkflow[$wfName][$tName] = true;
                     }
+                    if ((int) ($t['metadata']['batch'] ?? 0) > 0) {
+                        $batchByWorkflow[$wfName][$tName] = (int) $t['metadata']['batch'];
+                    }
                     if (isset($t['metadata']['transport']) && is_string($t['metadata']['transport'])) {
                         $asyncByWorkflow[$wfName][$tName] = $t['metadata']['transport'];
                     }
@@ -136,6 +140,7 @@ final class StatePrependExtension
 
         // ✅ Always set known parameters to defined (possibly empty) arrays
         $builder->setParameter('survos_state.place_transitions', $initialTransitions);
+        $builder->setParameter('survos_state.batch_transition_map', $batchByWorkflow);
         $builder->setParameter('survos_state.async_transition_map', []);
 
         if ($asyncByWorkflow) {

@@ -20,11 +20,24 @@ final class AsyncQueueLocator
     /**
      * @param array<string, array<string, string>> $map  e.g. ['media' => ['download' => 'media.download']]
      */
+    /**
+     * @param array<string, array<string, int>> $batchMap e.g. ['asset' => ['ai_task' => 500]]
+     */
     public function __construct(
         private readonly array $map,
         private readonly array $placeTransitions,
         private readonly EntityManagerInterface $entityManager,
+        private readonly array $batchMap = [],
     ) {}
+
+    /** Batch size for a #[Transition(batch: N)] transition, or null when it is handled one by one. */
+    public function batchSize(string $workflow, string $transition): ?int
+    {
+        [$wf, $tr] = QueueNameUtil::normalizePair($workflow, $transition);
+        $size = $this->batchMap[$wf][$tr] ?? $this->batchMap[$workflow][$transition] ?? null;
+
+        return $size !== null && $size > 0 ? (int) $size : null;
+    }
 
     // --- Primary (workflow-aware) API ---------------------------------------
 

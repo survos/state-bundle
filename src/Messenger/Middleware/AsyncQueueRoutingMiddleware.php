@@ -5,6 +5,7 @@ namespace Survos\StateBundle\Messenger\Middleware;
 
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Survos\StateBundle\Message\BatchedTransitionMessage;
 use Survos\StateBundle\Message\TransitionMessage;
 use Survos\StateBundle\Service\AsyncQueueLocator;
 use Symfony\Component\Messenger\Envelope;
@@ -15,9 +16,14 @@ use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 
 /**
- * Doctrine-first routing:
- * If a TransitionMessage is async (per AsyncQueueLocator) and no transport is set,
- * stamp the Doctrine transport name (queue) via TransportNamesStamp.
+ * If a TransitionMessage is async (per AsyncQueueLocator) and no transport is set, stamp the
+ * transition's own queue via TransportNamesStamp.
+ *
+ * NOT ON ANY BUS, so none of this runs today. Routing is done by the dispatch sites, which stamp
+ * via AsyncQueueLocator::stamps(); this class is the unused net under the ones that forget, and
+ * activating it is a deliberate behavior change. Read the note in SurvosStateBundle::loadExtension()
+ * before wiring it up -- in particular, do it with a compiler pass like
+ * BatchTransitionMiddlewarePass, never a framework.messenger config prepend.
  */
 final class AsyncQueueRoutingMiddleware implements MiddlewareInterface
 {
@@ -34,7 +40,9 @@ final class AsyncQueueRoutingMiddleware implements MiddlewareInterface
         }
 
         $msg = $envelope->getMessage();
-        if (!$msg instanceof TransitionMessage) {
+
+        // BatchedTransitionMessage: the swap happened upstream, in BatchTransitionMiddleware.
+        if (!$msg instanceof TransitionMessage && !$msg instanceof BatchedTransitionMessage) {
             return $stack->next()->handle($envelope, $stack);
         }
 
@@ -44,12 +52,12 @@ final class AsyncQueueRoutingMiddleware implements MiddlewareInterface
         }
 
         $transition = $msg->getTransitionName();
-        if (!$this->locator->isAsync($transition)) {
+        if (!$this->locator->isAsync($msg->getWorkflow(), $transition)) {
             // not async → sync fallback
             return $stack->next()->handle($envelope, $stack);
         }
 
-        $queue = $this->locator->queueFor($transition);
+        $queue = $this->locator->queueFor($msg->getWorkflow(), $transition);
         if ($queue) {
             $this->logger->debug('[AsyncQueueRouting] stamping transport', [
                 'transition' => $transition,

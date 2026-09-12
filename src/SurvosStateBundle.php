@@ -68,6 +68,8 @@ final class SurvosStateBundle extends AbstractUxBundle
     {
         parent::build($container);
         $this->addRouteLoaderCompilerPass($container);
+        // BatchTransitionMiddleware onto the buses; before MessengerPass (priority 0) builds them.
+        $container->addCompilerPass(new \Survos\StateBundle\Compiler\BatchTransitionMiddlewarePass(), \Symfony\Component\DependencyInjection\Compiler\PassConfig::TYPE_BEFORE_OPTIMIZATION, 10);
 //        $container->addCompilerPass(new RegisterWorkflowEntitiesPass());
     }
 
@@ -95,6 +97,9 @@ final class SurvosStateBundle extends AbstractUxBundle
             $def = $container->findDefinition(AsyncQueueLocator::class);
             $def->setArgument('$map', $container->getParameter('survos_state.async_transition_map'));
             $def->setArgument('$placeTransitions', $container->getParameter('survos_state.place_transitions'));
+            if ($container->hasParameter('survos_state.batch_transition_map')) {
+                $def->setArgument('$batchMap', $container->getParameter('survos_state.batch_transition_map'));
+            }
         }
     }
 
@@ -107,24 +112,51 @@ final class SurvosStateBundle extends AbstractUxBundle
 
         // 1) Register middleware + core services
         $builder->autowire(AsyncQueueRoutingMiddleware::class)->setAutoconfigured(true)->setPublic(false);
+        $builder->autowire(\Survos\StateBundle\Messenger\Middleware\BatchTransitionMiddleware::class)->setPublic(false)
+            ->setArgument('$batchEnabled', $config['batch_enabled'] ?? true);
         $builder->autowire(PrimaryKeyLocator::class)->setAutoconfigured(true)->setPublic(false);
 
-        // 2) Ensure middleware runs on default bus BEFORE send_message
-        if (($config['enable_dynamic_routing'] ?? true) === true) {
-            $builder->prependExtensionConfig('framework', [
-                'messenger' => [
-                    'buses' => [
-                        'messenger.bus.default' => [
-                            'middleware' => [
-                                AsyncQueueRoutingMiddleware::class,
-                            ],
-                        ],
-                    ],
-                ],
-            ]);
-        }
+        // 2) AsyncQueueRoutingMiddleware is registered as a service and NOTHING PUTS IT ON A BUS.
+        //
+        // Read that as: async transition routing does not come from here and never did. It comes
+        // from the dispatch sites, which stamp TransportNamesStamp themselves via
+        // AsyncQueueLocator::stamps(), onto the per-transition transports StatePrependExtension
+        // registers. That is the working, load-bearing path -- WorkflowListener::dispatchTransition,
+        // IterateCommand, InitialPlaceKickoffListener, TransitionDebugController and app code all
+        // take it. This middleware was only ever the belt to that pair of braces: a net under
+        // dispatch sites that forget to stamp, whose messages are handled inline instead.
+        //
+        // There used to be a prependExtensionConfig('framework', ...) here adding it to
+        // messenger.bus.default. It was inert for two independent reasons, both confirmed in
+        // mediary on 2026-09-11:
+        //
+        //  1. Prepending framework config from loadExtension() is too late. FrameworkBundle's
+        //     extension has already run, so the config is merged into a value nobody reads again.
+        //     It still showed up in `debug:config framework messenger.buses`, which is what made
+        //     this look wired for as long as it did -- then RemoveUnusedDefinitionsPass deleted the
+        //     service as "unused" (see var/cache/dev/*ContainerCompiler.log).
+        //  2. framework.messenger.buses.*.middleware does not deep-merge. Any other bundle's
+        //     prepend REPLACES the whole list; Inspector APM's InspectorExtension::prepend won in
+        //     mediary. So even correctly timed, a prepend is not a safe way to add middleware.
+        //
+        // The prepend is gone rather than fixed, deliberately. Turning this on is a real behavior
+        // change -- unstamped dispatches of async transitions stop running inline and start
+        // queueing -- and it is not needed for correctness anywhere: as of 2026-09-12 the only two
+        // sites that had forgotten to stamp (ssai ImageTaskController, harvest
+        // DatasetMediaGateListener) now stamp at the dispatch site like everything else.
+        //
+        // To activate it later, do NOT reinstate the prepend. Copy BatchTransitionMiddlewarePass:
+        // splice the class into each bus's `<bus>.middleware` parameter before MessengerPass, and
+        // gate it on enable_dynamic_routing by registering the definition only when that is true
+        // (the pass then early-returns on !hasDefinition, exactly as the batch pass does).
 
 
+
+        // Batched transitions (#[Transition(batch: N)]) — the one handler for BatchedTransitionMessage.
+        $builder->autowire(\Survos\StateBundle\Messenger\BatchTransitionHandler::class)
+            ->setAutoconfigured(true)
+            ->setArgument('$defaultBatchSize', $config['batch_size'] ?? 100)
+            ->setArgument('$idleTimeout', $config['batch_idle_timeout'] ?? 5);
 
         foreach ([AsyncQueueLocator::class,
                      WorkflowStatsService::class,
@@ -278,7 +310,16 @@ final class SurvosStateBundle extends AbstractUxBundle
             // Prefix is only used for non-Doctrine brokers. Empty by default.
             ->scalarNode('queue_prefix')->defaultValue('')->end()
             ->scalarNode('base_layout')->defaultValue('base.html.twig')->end()
-            ->booleanNode('enable_dynamic_routing')->defaultValue(true)->end()
+            // Currently INERT, and kept only so apps that set it still boot (mediary does).
+            // Nothing reads it: AsyncQueueRoutingMiddleware is registered but on no bus, and
+            // routing comes from AsyncQueueLocator::stamps() at the dispatch sites instead.
+            // See the long note in loadExtension() for what this would gate if activated.
+            ->booleanNode('enable_dynamic_routing')->defaultValue(true)
+                ->info('Inert as of 2026-09-12: transition routing comes from AsyncQueueLocator::stamps() at the dispatch site, not from middleware. See SurvosStateBundle::loadExtension().')
+            ->end()
+            ->integerNode('batch_size')->defaultValue(100)->info('Default size for #[Transition(batch: true-ish)] groups; a transition\'s own batch: N wins')->end()
+            ->integerNode('batch_idle_timeout')->defaultValue(5)->info('Seconds of worker idleness after which a partial batch is flushed')->end()
+            ->booleanNode('batch_enabled')->defaultTrue()->info('Off: #[Transition(batch: N)] transitions travel as plain TransitionMessages, one at a time, exactly as if unbatched. Env-able: \'%env(bool:APP_BATCH)%\'')->end()
             // Force-place: set a marking directly, running no transition and no guard.
             //
             // Debug-only by default, and that default is the recommendation. It is the

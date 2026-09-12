@@ -17,7 +17,15 @@ class Transition
         public ?string $transport=null,
         public ?bool $async=null,
         public ?array $next=[],
-
+        /**
+         * Handle this transition in batches of up to N subjects instead of one message at a time.
+         * Implies async. Listeners registered with #[AsBatchTransitionListener] receive every
+         * subject of a batch at once (one provider job, one bulk push); the transition is then
+         * applied to each subject with context ['batched' => true], so per-item
+         * #[AsTransitionListener]s can tell the bulk work was already done. See
+         * BatchTransitionHandler.
+         */
+        public ?int $batch=null,
     ) {
         if ($guard) {
             $this->metadata['guard'] = $guard;
@@ -38,6 +46,10 @@ class Transition
         }
         if ($this->next) {
             $this->metadata['next'] = $this->next;
+        }
+        if ($this->batch !== null && $this->batch > 0) {
+            $this->metadata['batch'] = $this->batch;
+            $this->metadata['async'] = true;
         }
 
     }
