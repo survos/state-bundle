@@ -137,9 +137,13 @@
                         {% endif %}
                         <li class="mb-1">
                             <i class="fas fa-play text-muted me-1"></i>
-                            <a class="fw-bold" href="{{ path('survos_command', rp) }}" title="{{ t.name }}">
-                                {{ transitionLabel ?: t.name }}
-                            </a>
+                            {% if commandRouteExists|default(false) %}
+                                <a class="fw-bold" href="{{ path('survos_command', rp) }}" title="{{ t.name }}">
+                                    {{ transitionLabel ?: t.name }}
+                                </a>
+                            {% else %}
+                                <span class="fw-bold" title="{{ t.name }}">{{ transitionLabel ?: t.name }}</span>
+                            {% endif %}
                             <span class="badge bg-azure-lt ms-1">{{ t.tos|join(', ') }}</span>
                             {% if transitionDescription %}
                                 <div class="text-secondary small">{{ transitionDescription }}</div>

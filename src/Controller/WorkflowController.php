@@ -247,6 +247,8 @@ class WorkflowController extends AbstractController
         // group by class
         return $this->render('@SurvosState/d3-workflow.html.twig', $params + [
                 'digraph' => $dumper,
+                // survos/command-bundle is optional; without it transitions render unlinked.
+                'commandRouteExists' => null !== $this->container->get('router')->getRouteCollection()->get('survos_command'),
                 // 'workflows' => $workflows['workflow']['workflows'],
             ]);
     }
