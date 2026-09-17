@@ -38,6 +38,15 @@ final class StatePrependExtension
             'multiplier'  => 2,
             'max_delay'   => 0,
         ];
+        // Broker-only transport options, which is exactly why they belong here rather than in an
+        // app's messenger.yaml: `queues` and `prefetch_count` are AMQP options and the Doctrine
+        // transport rejects unknown options outright, so an app that declared them in the shared
+        // transport block broke every test that instantiates a transport the moment queue_driver
+        // flipped to doctrine under when@test. The driver decides the options shape here already;
+        // these ride along with it.
+        $maxPriority       = null;
+        $prefetchCount     = null;
+        $queueOptions      = [];
 
         // In load order, so LATER config wins — the same precedence the
         // Configuration processor applies. ContainerBuilder::getExtensionConfig()
@@ -56,6 +65,11 @@ final class StatePrependExtension
             if (isset($cfg['queue_driver']))         { $queueDriver       = (string) $cfg['queue_driver']; }
             // Merged, not replaced, so an app can override just max_retries.
             if (isset($cfg['retry_strategy']))      { $retryStrategy     = array_merge($retryStrategy, (array) $cfg['retry_strategy']); }
+            if (isset($cfg['max_priority']))        { $maxPriority       = (int)    $cfg['max_priority']; }
+            if (isset($cfg['prefetch_count']))      { $prefetchCount     = (int)    $cfg['prefetch_count']; }
+            // Per-queue overrides, keyed by the queue this pass builds ("<workflow>.<transition>"),
+            // merged so an app can set one queue's prefetch without restating the rest.
+            if (isset($cfg['queue_options']))       { $queueOptions      = array_merge($queueOptions, (array) $cfg['queue_options']); }
         }
 
         // Published so other bundles (e.g. tabler-bundle's RabbitMqMenuSubscriber) can
@@ -207,9 +221,15 @@ final class StatePrependExtension
                         // the whole story and for what happens when it isn't available.
                         'rabbitmq' => [
                             'dsn'     => self::appendPathSegment($asyncTransportDsn, $queue),
-                            'options' => $delayDurableSupported
-                                ? ['auto_setup' => true, 'delay' => ['durable' => true]]
-                                : ['auto_setup' => true],
+                            'options' => self::brokerOptions(
+                                $delayDurableSupported
+                                    ? ['auto_setup' => true, 'delay' => ['durable' => true]]
+                                    : ['auto_setup' => true],
+                                $queue,
+                                $maxPriority,
+                                $prefetchCount,
+                                $queueOptions[$queue] ?? [],
+                            ),
                             'retry_strategy' => $delayDurableSupported
                                 ? $retryStrategy
                                 : ['max_retries' => 0],
@@ -243,6 +263,35 @@ final class StatePrependExtension
     }
 
     /** Append a path segment to a DSN, preserving any query string. */
+    /**
+     * Priority and prefetch for one dynamic RabbitMQ queue.
+     *
+     * `x-max-priority` declares the queue as a priority queue, which lets a publisher stamp a
+     * message's priority (jwage's AmqpStamp attributes) and have the broker deliver waiting
+     * messages in that order. RabbitMQ cannot change the argument on an existing classic queue:
+     * declaring it against one answers 406 PRECONDITION_FAILED ("inequivalent arg
+     * 'x-max-priority'"), so a queue that already exists must be drained and deleted before this
+     * is switched on. That is a deployment step, not something this pass can do.
+     *
+     * @param array<string, mixed> $options
+     * @param array<string, mixed> $overrides per-queue overrides: max_priority, prefetch_count
+     *
+     * @return array<string, mixed>
+     */
+    private static function brokerOptions(array $options, string $queue, ?int $maxPriority, ?int $prefetchCount, array $overrides): array
+    {
+        $priority = isset($overrides['max_priority']) ? (int) $overrides['max_priority'] : $maxPriority;
+        $prefetch = isset($overrides['prefetch_count']) ? (int) $overrides['prefetch_count'] : $prefetchCount;
+        if ($priority !== null && $priority > 0) {
+            $options['queues'] = [$queue => ['arguments' => ['x-max-priority' => $priority]]];
+        }
+        if ($prefetch !== null && $prefetch > 0) {
+            $options['prefetch_count'] = $prefetch;
+        }
+
+        return $options;
+    }
+
     private static function appendPathSegment(string $dsn, string $segment): string
     {
         [$base, $query] = str_contains($dsn, '?') ? explode('?', $dsn, 2) : [$dsn, null];

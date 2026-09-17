@@ -337,6 +337,30 @@ final class SurvosStateBundle extends AbstractUxBundle
             // StatePrependExtension) — not inferred from async_transport_dsn's scheme,
             // since that's frequently an unresolved %env(...)% placeholder at compile time.
             ->enumNode('queue_driver')->values(['doctrine', 'rabbitmq'])->defaultValue('doctrine')->end()
+            // Broker-only, applied by StatePrependExtension to every dynamic rabbitmq queue and
+            // ignored by the doctrine driver, which rejects these as unknown options. An app used
+            // to declare them in its own messenger.yaml, which meant the AMQP shape leaked into
+            // when@test and broke any test that instantiated a transport.
+            //
+            // max_priority declares the queues as priority queues (x-max-priority), so a publisher
+            // can stamp a message's priority and the broker delivers waiting messages in that
+            // order. Null leaves the queues as plain classic queues. Switching it on for queues
+            // that already exist requires draining and deleting them first: RabbitMQ answers 406
+            // PRECONDITION_FAILED rather than redefining a live queue.
+            ->integerNode('max_priority')->defaultNull()->min(1)->max(255)->end()
+            ->integerNode('prefetch_count')->defaultNull()->min(1)->end()
+            // Per-queue overrides keyed by queue name ("<workflow>.<transition>", as the queue is
+            // built), for the one stage that wants a different prefetch from the rest -- a batched
+            // AI handler wants several deliveries in flight, an archive worker wants one.
+            ->arrayNode('queue_options')
+                ->useAttributeAsKey('queue')
+                ->arrayPrototype()
+                    ->children()
+                        ->integerNode('max_priority')->min(1)->max(255)->end()
+                        ->integerNode('prefetch_count')->min(1)->end()
+                    ->end()
+                ->end()
+            ->end()
             // Retry policy applied to every dynamic per-transition transport this bundle
             // registers (both drivers). Symfony's own defaults; override per app.
             //
