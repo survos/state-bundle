@@ -7,14 +7,23 @@ use Doctrine\DBAL\Connection;
 use Survos\StateBundle\Messenger\Stamp\ContextStamp;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Stamp\StampInterface;
 use ReflectionClass;
 use ReflectionProperty;
 
-#[AsCommand(name: 'state:stats', description: 'Show messenger stats with ContextStamp breakdown (Doctrine transport; deserializes Envelope from body with de-escaping).')]
-final class StateStatsCommand
+/**
+ * "Where did all these messages come from?" Counts the pending messages per ContextStamp value
+ * (a tenant, project, aggregator…), per queue.
+ *
+ * Doctrine transport only: it reads the messenger table, because that is the one place queued
+ * messages can be queried. A broker (RabbitMQ, Redis) can report how many messages a queue holds
+ * (`messenger:stats`) but not what is in them.
+ */
+#[AsCommand(name: 'state:queues:contexts', description: 'Count pending messages per ContextStamp (tenant/project), per queue; Doctrine transport only')]
+final class StateQueuesContextsCommand
 {
     public function __construct(
         private readonly Connection $db,
@@ -31,7 +40,17 @@ final class StateStatsCommand
         #[Option('Pretty-print the first pending message as JSON (decoded from body)')]
         bool $debugBody = false,
     ): int {
-        $io->title('State / Messenger Context Stats');
+        // Nothing to read unless the app queues through the Doctrine transport.
+        if (!$this->db->createSchemaManager()->tablesExist([$table])) {
+            $io->warning(sprintf(
+                'No "%s" table on this connection, so there are no queued messages to inspect. This command reads the Doctrine messenger transport only; with RabbitMQ or Redis, use messenger:stats for queue sizes.',
+                $table,
+            ));
+
+            return Command::SUCCESS;
+        }
+
+        $io->title('Pending messages by context');
 
         // precedence: --filter-env > STATE_FILTER_ENV > "CONTEXT_STAMP"
         $envName = $filterEnv ?: (\getenv('STATE_FILTER_ENV') ?: 'CONTEXT_STAMP');

@@ -10,6 +10,7 @@ use Survos\StateBundle\Event\RowEvent;
 use Survos\StateBundle\Message\TransitionMessage;
 use Survos\StateBundle\Service\AsyncQueueLocator;
 use Survos\StateBundle\Service\WorkflowHelperService;
+use Survos\StateBundle\Util\QueryFilters;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
@@ -29,7 +30,11 @@ use Zenstruck\Alias;
 use Zenstruck\Messenger\Monitor\Stamp\DescriptionStamp;
 use Zenstruck\Messenger\Monitor\Stamp\TagStamp;
 
-#[AsCommand('state:iterate', 'Iterate a Doctrine entity and dispatch workflow transitions.', aliases: ['iterate'])]
+/**
+ * The state:* commands that work on a workflow-enabled Doctrine entity: state:iterate dispatches
+ * transitions, state:stats only reports. One class, so they share class resolution, workflow
+ * lookups and the --filter syntax (Survos\StateBundle\Util\QueryFilters).
+ */
 final class IterateCommand
 {
     public function __construct(
@@ -45,7 +50,8 @@ final class IterateCommand
     ) {
     }
 
-    public function __invoke(
+    #[AsCommand('state:iterate', 'Iterate a Doctrine entity and dispatch workflow transitions.', aliases: ['iterate'])]
+    public function iterate(
         SymfonyStyle $io,
 
         // ARGUMENTS — description only (name inferred from parameter)
@@ -59,7 +65,7 @@ final class IterateCommand
         #[Option('Comma-separated property paths to dump for each row', shortcut: 'd')] string $dump = '',
         #[Option('grid:index after flush?')] ?bool $indexAfterFlush = null,
         #[Option('filter using urlQuerystring style')] string $filter='',
-        #[Option('Show counts per marking and exit', shortcut: 's')] ?bool $stats = null,
+        #[Option('Deprecated: use state:stats <class>. Show counts per marking and exit', shortcut: 's')] ?bool $stats = null,
         #[Option('force sync (no queues)', shortcut: 'y')] ?bool $sync = null,
         #[Option('What to do with chained transitions: async|sync|none. Default: sync when --sync, else async.')] ?string $cascade = null,
         #[Option('limit the number of records')] int $limit = 0,
@@ -494,64 +500,12 @@ final class IterateCommand
 
     private function applyWhereFilters($qb, array $filters): void
     {
-        foreach ($filters as $field => $value) {
-            $operator = null;
-            if (str_contains((string) $field, '__')) {
-                [$field, $operator] = explode('__', (string) $field, 2);
-            }
-
-            $parameter = str_replace('.', '_', (string) $field);
-            if ($operator === 'isnull') {
-                $isNull = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-                $qb->andWhere(sprintf('e.%s IS %sNULL', $field, $isNull === false ? 'NOT ' : ''));
-                continue;
-            }
-
-            if (is_string($value) && strtolower($value) === 'null') {
-                $qb->andWhere(sprintf('e.%s IS NULL', $field));
-                continue;
-            }
-
-            if (is_string($value) && strtolower($value) === '!null') {
-                $qb->andWhere(sprintf('e.%s IS NOT NULL', $field));
-                continue;
-            }
-
-            // A %-delimited value means LIKE. --filter is documented as urlQuerystring style
-            // and this was always the intent: a second private applyFilters() implemented
-            // exactly this and was never called -- its only call site sat commented out -- so a
-            // value like `originalUrl=%clevelandart%` compiled to an exact `=` against the
-            // literal string "%clevelandart%" and matched nothing. That dead copy has been
-            // deleted; this is now the one and only filter applier.
-            //
-            // The silent part is what made it expensive: iterate then reports
-            // "No items found for filter", which reads as "your data is wrong" rather than
-            // "your operator was ignored" -- against a dataset that demonstrably had 24 matching
-            // rows. Keep the wildcard branch ahead of the exact-match fallback so the documented
-            // syntax and the executed query cannot drift apart again.
-            if (is_string($value) && (str_starts_with($value, '%') || str_ends_with($value, '%'))) {
-                $qb->andWhere(sprintf('e.%s LIKE :%s', $field, $parameter));
-                $qb->setParameter($parameter, $value);
-                continue;
-            }
-
-            if (is_array($value)) {
-                $qb->andWhere(sprintf('e.%s IN (:%s)', $field, $parameter));
-            } else {
-                $qb->andWhere(sprintf('e.%s = :%s', $field, $parameter));
-            }
-            $qb->setParameter($parameter, $value);
-        }
+        QueryFilters::apply($qb, $filters);
     }
 
     private function parseFilters(?string $filterString): array
     {
-        if (!$filterString) {
-            return [];
-        }
-
-        parse_str($filterString, $filters);
-        return $filters;
+        return QueryFilters::parse($filterString);
     }
 
     private function getManagerForClass(string $className): EntityManagerInterface
@@ -561,5 +515,184 @@ final class IterateCommand
             throw new \InvalidArgumentException("No entity manager found for class: $className");
         }
         return $manager;
+    }
+
+    /**
+     * Where things are in a workflow: a count per place, with each place's description and the
+     * transitions that lead out of it. Read-only, and the replacement for `state:iterate --stats`.
+     *
+     * To expose it as an MCP tool with survos/command-bundle, opt in per app:
+     *
+     *     survos_command:
+     *         agent_tools:
+     *             - { command: 'state:stats', readOnly: true }
+     */
+    #[AsCommand('state:stats', 'Count entities per workflow place (marking), with each place\'s description and outgoing transitions', help: <<<'HELP'
+        Without a class, summarises every entity that has a workflow. With one, lists every place of its
+        workflow (empty places included), how many entities are in it, and which transitions lead out of it.
+        Use it to see whether a pipeline is moving or stuck, and which transition would move a stuck place on.
+        Narrow it to a tenant or project with a filter on the entity's own fields, e.g. "project=1".
+        HELP)]
+    public function stats(
+        SymfonyStyle $io,
+        #[Argument('Entity class, full or short, e.g. "Article" or "App\Entity\Article"; omit to summarise all')] ?string $className = null,
+        #[Option('Workflow name, when the class has more than one')] ?string $workflowName = null,
+        #[Option('Only count entities matching these field filters, query-string style, e.g. "project=1" or "host=%example%"')] string $filter = '',
+        #[Option('Output format: text or json')] string $format = 'text',
+    ): int {
+        $grouped = $this->workflowHelperService->getWorkflowsGroupedByClass();
+        $filters = QueryFilters::parse($filter);
+
+        if (null === $className) {
+            if ($filters) {
+                throw new \InvalidArgumentException('A filter needs a class: fields differ between entities.');
+            }
+            $classes = [];
+            foreach ($grouped as $class => $workflowNames) {
+                try {
+                    $classes[] = $this->describe($class, $workflowNames[0], false);
+                } catch (\LogicException $e) {
+                    // One misconfigured entity must not hide the rest of the summary.
+                    $classes[] = ['class' => $class, 'workflow' => $workflowNames[0], 'total' => 0, 'markings' => [], 'problem' => $e->getMessage()];
+                }
+            }
+
+            return $this->emit($io, $format, ['classes' => $classes], function () use ($io, $classes): void {
+                $io->table(['class', 'workflow', 'total', 'markings'], array_map(fn (array $c) => [
+                    $c['class'], $c['workflow'], $c['total'],
+                    $c['problem'] ?? (implode(', ', array_map(fn (array $m) => $m['marking'].': '.$m['count'], array_filter($c['markings'], fn (array $m) => $m['count'] > 0))) ?: '-'),
+                ], $classes));
+            });
+        }
+
+        $class = $this->resolveClass($className, array_keys($grouped));
+        if (null === $class) {
+            throw new \InvalidArgumentException(sprintf('No workflow for "%s". Classes with a workflow: %s.', $className, implode(', ', array_keys($grouped)) ?: 'none'));
+        }
+        $workflowName ??= $grouped[$class][0];
+        if (!in_array($workflowName, $grouped[$class], true)) {
+            throw new \InvalidArgumentException(sprintf('"%s" has no workflow "%s". Its workflows: %s.', $class, $workflowName, implode(', ', $grouped[$class])));
+        }
+        $result = $this->describe($class, $workflowName, true, $filters);
+        if ($filters) {
+            $result['filter'] = $filters;
+        }
+
+        return $this->emit($io, $format, $result, function () use ($io, $result): void {
+            $io->title(sprintf('%s (%s): %d', $result['class'], $result['workflow'], $result['total']));
+            $io->table(['marking', 'count', 'description', 'transitions out'], array_map(fn (array $m) => [
+                $m['marking'], $m['count'], $m['info'] ?? '',
+                implode("\n", array_map(fn (array $t) => sprintf('%s → %s%s', $t['name'], implode('|', $t['to']), isset($t['info']) ? '  '.$t['info'] : ''), $m['transitions'])),
+            ], $result['markings']));
+        });
+    }
+
+    /** @return array{class: string, workflow: string, total: int, markings: list<array<string, mixed>>} */
+    private function describe(string $class, string $workflowName, bool $withTransitions, array $filters = []): array
+    {
+        $workflow = $this->workflowHelperService->getWorkflowByCode($workflowName);
+        $counts = $this->counts($class, $filters);
+        $store = $workflow->getMetadataStore();
+
+        // Every place the workflow defines, then any marking found in the data that it doesn't
+        // (a renamed or removed place still holding rows is exactly what this should surface).
+        $places = array_values($workflow->getDefinition()->getPlaces());
+        $markings = [];
+        foreach (array_unique([...$places, ...array_map('strval', array_keys($counts))]) as $place) {
+            $known = in_array($place, $places, true);
+            $row = array_filter([
+                'marking' => $place,
+                'count' => (int) ($counts[$place] ?? 0),
+                'info' => $known ? ($store->getPlaceMetadata($place)['info'] ?? null) : 'not a place in this workflow',
+            ], fn ($v) => null !== $v);
+            if ($withTransitions) {
+                $row['transitions'] = $known ? $this->transitionsFrom($workflow, $place) : [];
+            }
+            $markings[] = $row;
+        }
+
+        return ['class' => $class, 'workflow' => $workflowName, 'total' => array_sum(array_column($markings, 'count')), 'markings' => $markings];
+    }
+
+    /**
+     * Entities per marking, from the entity table itself: the marking is the record of where
+     * things are, whatever transport the messages travel on.
+     *
+     * @param array<string, mixed> $filters
+     *
+     * @return array<string, int>
+     */
+    private function counts(string $class, array $filters): array
+    {
+        $em = $this->doctrine->getManagerForClass($class) ?? $this->entityManager;
+        if (!$em->getClassMetadata($class)->hasField('marking')) {
+            throw new \LogicException(sprintf('%s has a workflow but no "marking" field to count by.', $class));
+        }
+        $metadata = $em->getClassMetadata($class);
+        foreach (array_keys($filters) as $field) {
+            $name = explode('__', (string) $field, 2)[0];
+            if (!$metadata->hasField($name) && !$metadata->hasAssociation($name)) {
+                throw new \InvalidArgumentException(sprintf(
+                    'Cannot filter %s by "%s". Its fields: %s.',
+                    $class, $name, implode(', ', [...$metadata->getFieldNames(), ...$metadata->getAssociationNames()]),
+                ));
+            }
+        }
+        $qb = $em->createQueryBuilder()
+            ->select('e.marking AS marking, COUNT(e) AS n')
+            ->from($class, 'e')
+            ->groupBy('e.marking');
+        QueryFilters::apply($qb, $filters);
+
+        $counts = [];
+        foreach ($qb->getQuery()->getArrayResult() as $row) {
+            $counts[(string) $row['marking']] = (int) $row['n'];
+        }
+
+        return $counts;
+    }
+
+    /** @return list<array{name: string, to: list<string>, info?: string, guard?: string}> */
+    private function transitionsFrom(WorkflowInterface $workflow, string $place): array
+    {
+        $store = $workflow->getMetadataStore();
+        $transitions = [];
+        foreach ($workflow->getDefinition()->getTransitions() as $transition) {
+            if (!in_array($place, $transition->getFroms(), true)) {
+                continue;
+            }
+            $meta = $store->getTransitionMetadata($transition);
+            $transitions[] = array_filter([
+                'name' => $transition->getName(),
+                'to' => array_values($transition->getTos()),
+                'info' => $meta['info'] ?? null,
+                'guard' => isset($meta['guard']) ? (string) $meta['guard'] : null,
+            ], fn ($v) => null !== $v);
+        }
+
+        return $transitions;
+    }
+
+    /** @param list<string> $classes */
+    private function resolveClass(string $name, array $classes): ?string
+    {
+        foreach ($classes as $class) {
+            if ($class === ltrim($name, '\\') || 0 === strcasecmp(substr($class, (int) strrpos($class, '\\') + 1), $name)) {
+                return $class;
+            }
+        }
+
+        return null;
+    }
+
+    private function emit(SymfonyStyle $io, string $format, array $data, callable $text): int
+    {
+        if ('json' === $format) {
+            $io->writeln(json_encode($data, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES));
+        } else {
+            $text();
+        }
+
+        return Command::SUCCESS;
     }
 }

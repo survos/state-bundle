@@ -12,7 +12,7 @@ use Survos\StateBundle\Command\DumpWorkflowsYamlCommand;
 use Survos\StateBundle\Command\IterateCommand;
 use Survos\StateBundle\Command\MakeWorkflowCommand;
 use Survos\StateBundle\Command\StateQueuesDumpCommand;
-use Survos\StateBundle\Command\StateStatsCommand;
+use Survos\StateBundle\Command\StateQueuesContextsCommand;
 use Survos\StateBundle\Compiler\RegisterWorkflowEntitiesPass;
 use Survos\StateBundle\Compiler\StatePrependExtension;
 use Survos\StateBundle\Controller\TransitionDebugController;
@@ -190,7 +190,11 @@ final class SurvosStateBundle extends AbstractUxBundle
             ->addTag('container.service_subscriber')
             ->addTag('controller.service_arguments');
 
-        foreach ([IterateCommand::class,
+        // state:iterate and state:stats are method-level commands on one class: autoconfiguration
+        // tags each method, so no class-level console.command tag here.
+        $builder->autowire(IterateCommand::class)->setAutoconfigured(true);
+
+        foreach ([
                      DumpWorkflowPhpCommand::class,
                      DumpWorkflowsYamlCommand::class,
                      MakeWorkflowCommand::class,
@@ -241,7 +245,7 @@ final class SurvosStateBundle extends AbstractUxBundle
                 ->set('console.command.survos_workflow_dump', WorkflowDumpCommand::class)
                 ->args([tagged_locator('workflow', 'name')]);
         }
-        $builder->autowire(StateStatsCommand::class)
+        $builder->autowire(StateQueuesContextsCommand::class)
             ->setPublic(true)
             ->setAutowired(true)
 //            ->setArgument('$filterEnvName', '%env(default:CONTEXT_STAMP:STATE_FILTER_ENV)%')
