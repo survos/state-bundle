@@ -83,6 +83,17 @@ final class SurvosStateBundle extends AbstractUxBundle
         $processed = (new Processor())->processConfiguration($configuration, $rawFramework);
 
         $workflowConfig = $processed['workflows']['workflows'] ?? [];
+        // Symfony 8.2 moved workflows out of FrameworkBundle: `framework.workflows` is now an alias of the
+        // `workflow` extension's configuration, so the framework config above no longer carries them (and
+        // every consumer of workflows.configuration saw none). 8.1 still has them under framework, so this
+        // only kicks in when that came back empty.
+        if ($workflowConfig === [] && $container->hasExtension('workflow')) {
+            $workflowExt = $container->getExtension('workflow');
+            $rawWorkflow = $container->getExtensionConfig('workflow');
+            if (($workflowConfiguration = $workflowExt->getConfiguration($rawWorkflow, $container)) !== null) {
+                $workflowConfig = (new Processor())->processConfiguration($workflowConfiguration, $rawWorkflow)['workflows'] ?? [];
+            }
+        }
         $container->setParameter('workflows.configuration', $workflowConfig);
 
 
