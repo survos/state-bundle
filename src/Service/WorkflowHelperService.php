@@ -306,18 +306,25 @@ class WorkflowHelperService
         $dot = $this->dumper->dump($definition, $marking, [
             //graphviz docs http://www.graphviz.org/doc/info/attrs.html
             'graph' => [
-                'ratio' => 'compress',
-                'width' => 0.5,
+                'bgcolor' => 'transparent',
+                'pad' => '0.35',
+                'nodesep' => '0.45',
                 'rankdir' => $this->direction,
-                'ranksep' => 0.2,
+                'ranksep' => '0.65',
             ],
             'node' => [
-                'width' => 0.5,
-                'shape' => 'ellipse',
+                'width' => '1.6',
+                'height' => '0.6',
+                'margin' => '0.18,0.12',
+                'fontsize' => '13',
+                'fontname' => 'Arial',
             ],
             'edge' => [
-                'shape' => 'box',
-                'arrowsize' => '0.5',
+                'color' => '#94a3b8',
+                'fontcolor' => '#52647a',
+                'fontsize' => '10',
+                'penwidth' => '1.3',
+                'arrowsize' => '0.7',
             ],
         ]);
 
@@ -578,14 +585,15 @@ ORDER BY n.nspname, c.relname;");
             ];
         }
 
-        $response = [
+        // Plain data only. Messenger keeps a handler's return value on the HandledStamp, and a parallel worker (messenger:consume
+        // --concurrency) has to serialise the handled envelope back to its parent: an entity (often a Doctrine lazy proxy, which holds
+        // closures) or a workflow Marking in here makes that fail with "Serialization of 'Closure' is not allowed".
+        return [
             'message' => "applied $transition to $shortName::$id ($initialMarking)",
-            //     'details' => json_encode((array)$message),
             'initialMarking' => $initialMarking,
-            'marking' => $marking,
-            'class' => $object,
+            'marking' => array_keys($marking->getPlaces()),
+            'class' => $message->getClassName(),
         ];
-        return $response;
 
     }
 

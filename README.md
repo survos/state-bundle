@@ -132,7 +132,7 @@ Now create a separate `SubmissionWorkflow` service/listener that uses these cons
 ```bash
 symfony new workflow-demo  --webapp --php=8.4 && cd workflow-demo 
 composer config extra.symfony.allow-contrib true
-bin/console importmap:require d3
+bin/console importmap:require d3-graphviz
 
 composer config minimum-stability beta
 bin/console make:controller d3 -i
@@ -163,3 +163,15 @@ Since the workflow may use a message bus, a reminder on how to configure that wi
 
 https://github.com/survos/SurvosWorkflowHelperBundle/network/dependents
 https://github.com/codereviewvideos/symfony-workflow-example
+
+### Workflow diagram assets
+
+For existing AssetMapper applications (including applications linked to mono), run
+`php bin/console importmap:require 'd3-graphviz@^5.6'` to install the renderer and
+its dependencies. New Flex installations read this dependency from
+`assets/package.json` under `symfony.importmap`. Enable the `workflow` controller
+under `@survos/state-bundle` in `assets/controllers.json`.
+
+The diagram mounts through Stimulus, including after Turbo navigation. Rendering
+errors display a message instead of leaving an empty card; places and transitions
+remain available beside the diagram.

@@ -76,13 +76,17 @@ final class InitialPlaceKickoffListener
             return;
         }
 
-        $entities      = $this->pending;
-        $this->pending = [];
-
         $this->dispatching = true;
         try {
-            foreach ($entities as $entity) {
-                $this->kickoff($entity, $args);
+            // A synchronous transition can persist dependencies and flush while
+            // dispatching. Re-entrant postFlush leaves those rows pending; drain
+            // them here so they start once without waiting for an unrelated flush.
+            while ($this->pending !== []) {
+                $entities = $this->pending;
+                $this->pending = [];
+                foreach ($entities as $entity) {
+                    $this->kickoff($entity, $args);
+                }
             }
         } finally {
             $this->dispatching = false;

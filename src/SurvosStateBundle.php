@@ -56,8 +56,6 @@ final class SurvosStateBundle extends AbstractUxBundle
 {
     use HasConfigurableRoutes;
 
-    public const ASSET_PACKAGE = 'state';
-
     public function getAlias(): string
     {
         // matches "survos_state:" in consumer apps

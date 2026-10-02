@@ -75,7 +75,7 @@
     <pre>{{ digraphData }}</pre>
 
 <div
-        {% set _controller = '@survos/state/workflow' %}
+        {% set _controller = survos_stimulus('state-bundle', 'workflow') %}
     {{ stimulus_controller(_controller, {
         digraph: digraphData
     }) }}

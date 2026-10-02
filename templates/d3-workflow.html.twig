@@ -1,342 +1,111 @@
 {% extends ['base.html.twig', '@SurvosState/layout.html.twig'] %}
-
 {% block page_title "%s Workflow"|format(flowCode) %}
-{% block page_subtitle "Place count?" %}
-
-{# ux icon lock issue #}
-    {% set iterateCommand = 'state:iterate' %}
+{% block page_subtitle "Explore the states and the paths between them" %}
 {% block stylesheets %}
     {{ parent() }}
     <style>
-        /* Graph fills its card; the card fills the viewport beside the sidebar. */
-        .workflow-graph-card { height: calc(100vh - 9rem); min-height: 28rem; display: flex; flex-direction: column; }
-        /* card-body must be a flex child that can shrink, so the graph gets a real height to scale into */
-        .workflow-graph-card > .card-body { flex: 1 1 auto; min-height: 0; }
-        .workflow-graph { width: 100%; height: 100%; overflow: hidden; }
-        .workflow-graph svg { display: block; width: 100%; height: 100%; }
-        /* native tooltips for nodes/edges */
-        .workflow-graph g.node, .workflow-graph g.edge { cursor: help; }
-        .workflow-sidebar { max-height: calc(100vh - 9rem); overflow-y: auto; }
+        .wf-explorer { --wf-blue: #2563eb; --wf-ink: #243247; --wf-muted: #64748b; color: var(--wf-ink); }
+        .wf-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; }
+        .wf-canvas, .wf-sidebar { border: 1px solid #dce3ec; border-radius: 16px; background: #fff; overflow: hidden; box-shadow: 0 3px 12px #24324706; }
+        .wf-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px 20px; border-bottom: 1px solid #e8edf3; }
+        .wf-eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: 10px; font-weight: 700; color: var(--wf-muted); }
+        .wf-toolbar h2 { margin: 3px 0 0; font-size: 16px; font-weight: 650; }
+        .wf-controls { display: flex; gap: 6px; }
+        .wf-button { border: 1px solid #dce3ec; border-radius: 8px; background: #fff; color: var(--wf-ink); padding: 7px 11px; font: inherit; font-size: 12px; cursor: pointer; }
+        .wf-button:hover { background: #eff6ff; border-color: #93b4f5; }
+        .wf-button:focus-visible, .wf-place:focus-visible { outline: 3px solid #93b4f5; outline-offset: 2px; }
+        .wf-graph { height: clamp(440px, 66vh, 850px); width: 100%; overflow: hidden; background-color: #fbfcfe; background-image: radial-gradient(#dce3ed .8px, transparent .8px); background-size: 18px 18px; touch-action: none; cursor: grab; }
+        .wf-graph:active { cursor: grabbing; }
+        .wf-graph svg { width: 100%; height: 100%; display: block; }
+        .wf-graph g.node { cursor: pointer; }
+        .wf-graph g.node:focus { outline: none; }
+        .wf-graph g.node:focus > polygon, .wf-graph g.node:focus > path { stroke: #2563eb; stroke-width: 3; }
+        .wf-graph g.node, .wf-graph g.edge { transition: opacity .15s; }
+        .wf-graph .wf-dim { opacity: .16; }
+        .wf-graph .wf-selected > path, .wf-graph .wf-selected > polygon { stroke: #2563eb; stroke-width: 3; fill: #dbeafe; }
+        .wf-graph .wf-connected path { stroke: #2563eb; stroke-width: 2; }
+        .wf-graph .wf-connected polygon { fill: #2563eb; stroke: #2563eb; }
+        .wf-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 13px 20px; border-top: 1px solid #e8edf3; font-size: 11px; color: var(--wf-muted); }
+        .wf-legend { display: flex; gap: 14px; align-items: center; }
+        .wf-key { display: inline-block; width: 10px; height: 10px; border: 1px solid #cbd5e1; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+        .wf-key-start { background: #eff6ff; border-color: #2563eb; }
+        .wf-key-end { background: #f1f5f9; border: 3px double #64748b; }
+        .wf-sidebar { align-self: start; }
+        .wf-sidebar-head { padding: 20px; border-bottom: 1px solid #e8edf3; }
+        .wf-sidebar-head h3 { font-size: 15px; margin: 0 0 6px; }
+        .wf-hint { color: var(--wf-muted); font-size: 12px; line-height: 1.6; margin: 0; }
+        .wf-search { width: 100%; border: 1px solid #dce3ec; border-radius: 8px; padding: 9px 11px; margin-top: 14px; font: inherit; font-size: 12px; }
+        .wf-places { max-height: 55vh; overflow-y: auto; }
+        .wf-place-row { border-bottom: 1px solid #edf1f6; padding: 14px 18px; }
+        .wf-place-row:last-child { border-bottom: 0; }
+        .wf-place-row.wf-active { background: #eff6ff; box-shadow: inset 3px 0 #2563eb; }
+        .wf-place { display: flex; gap: 8px; align-items: center; width: 100%; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; }
+        .wf-tag { margin-left: auto; flex-shrink: 0; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #64748b; background: #f1f5f9; border-radius: 4px; padding: 2px 5px; }
+        .wf-tag-start { color: #1d4ed8; background: #dbeafe; }
+        .wf-code { display: block; margin: 4px 0 0; font-size: 10px; color: #8996a8; overflow-wrap: anywhere; }
+        .wf-description { margin: 8px 0 0; font-size: 11px; line-height: 1.6; color: var(--wf-muted); overflow-wrap: anywhere; }
+        .wf-transition { margin-top: 10px; padding-top: 10px; border-top: 1px solid #dce6f4; font-size: 11px; }
+        .wf-transition strong { color: #334d70; }
+        .wf-transition small { display: block; margin-top: 3px; color: var(--wf-muted); }
+        .wf-status { padding: 22px; color: var(--wf-muted); }
+        @media (max-width: 1000px) { .wf-layout { grid-template-columns: 1fr; } .wf-places { max-height: 350px; } .wf-graph { height: 60vh; min-height: 400px; } }
+        @media (prefers-reduced-motion: reduce) { .wf-graph g.node, .wf-graph g.edge { transition: none; } }
     </style>
 {% endblock %}
-
-{% block javascripts %}
-    {{ parent() }}
-    <script type="module">
-        import {graphviz} from 'd3-graphviz';
-
-        document.addEventListener("DOMContentLoaded", function () {
-            const target = document.getElementById('digraphData');
-            const source = document.getElementById('digraphSource');
-            if (!target || !source) {
-                return;
-            }
-            const dot = source.textContent;
-            const XLINK = 'http://www.w3.org/1999/xlink';
-            const SVGNS = 'http://www.w3.org/2000/svg';
-
-            // graphviz puts the full description on an <a xlink:title>; promote it to a
-            // <title> element so every browser shows it as a native hover tooltip.
-            function promoteTooltips() {
-                target.querySelectorAll('g.node, g.edge').forEach(g => {
-                    const a = g.querySelector('a');
-                    const tip = a && (a.getAttributeNS(XLINK, 'title') || a.getAttribute('xlink:title'));
-                    if (!tip) {
-                        return;
-                    }
-                    let title = g.querySelector(':scope > title');
-                    if (!title) {
-                        title = document.createElementNS(SVGNS, 'title');
-                        g.insertBefore(title, g.firstChild);
-                    }
-                    title.textContent = tip;
-                });
-            }
-
-            // keep graphviz's viewBox but drop the fixed pixel size, so CSS scales the
-            // whole graph to fit the card while preserving its aspect ratio.
-            function onRendered() {
-                const svg = target.querySelector('svg');
-                if (svg) {
-                    svg.removeAttribute('width');
-                    svg.removeAttribute('height');
-                    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                }
-                promoteTooltips();
-            }
-
-            graphviz(target, {useWorker: false, zoom: false})
-                .renderDot(dot, onRendered);
-        });
-    </script>
-{% endblock %}
-
 {% block body %}
-    {% set digraphData = workflow_digraph(entity, flowCode, 'TB') %}
-    {% set isDebug = app.request.query.get('debug', false) %}
-
-    <div class="row g-3 align-items-stretch">
-        <div class="col-12 col-xl-9">
-            <div class="card workflow-graph-card">
-                <div class="card-header">
-                    <h2 class="card-title mb-0">{{ flowCode }} Workflow</h2>
-                    <div class="card-actions">
-                        <span class="badge bg-blue-lt">{{ definition.places|length }} places</span>
-                        <span class="badge bg-green-lt">{{ definition.transitions|length }} transitions</span>
+    {% set controller = survos_stimulus('state-bundle', 'workflow') %}
+    {% set digraphData = digraph is defined ? digraph : workflow_digraph(entity, flowCode) %}
+    <div class="wf-explorer" {{ stimulus_controller(controller, {digraph: digraphData}) }}>
+        <div class="wf-layout">
+            <section class="wf-canvas" aria-label="Workflow diagram">
+                <header class="wf-toolbar">
+                    <div><div class="wf-eyebrow">Workflow map</div><h2>{{ definition.places|length }} states <span class="text-secondary">/ {{ definition.transitions|length }} transitions</span></h2></div>
+                    <div class="wf-controls" aria-label="Diagram controls">
+                        <button class="wf-button" type="button" {{ stimulus_action(controller, 'zoomOut') }} aria-label="Zoom out">−</button>
+                        <button class="wf-button" type="button" {{ stimulus_action(controller, 'zoomIn') }} aria-label="Zoom in">+</button>
+                        <button class="wf-button" type="button" {{ stimulus_action(controller, 'fit') }}>Fit</button>
+                        <button class="wf-button" type="button" {{ stimulus_action(controller, 'clear') }}>Show all</button>
                     </div>
+                </header>
+                <div id="digraphData" class="wf-graph" {{ stimulus_target(controller, 'graph') }} aria-label="Interactive workflow map">
+                    <p class="wf-status" role="status">Loading workflow diagram…</p>
                 </div>
-                <div class="card-body p-2">
-                    <div id="digraphData" class="workflow-graph"></div>
+                <footer class="wf-footer">
+                    <div class="wf-legend"><span><i class="wf-key wf-key-start"></i>Start</span><span><i class="wf-key"></i>State</span><span><i class="wf-key wf-key-end"></i>Terminal</span></div>
+                    <span {{ stimulus_target(controller, 'status') }} role="status" aria-live="polite">Select a state to trace its connections · Drag to pan</span>
+                </footer>
+            </section>
+            <aside class="wf-sidebar" aria-label="Workflow states">
+                <div class="wf-sidebar-head"><h3>Explore states</h3><p class="wf-hint">Select a state to highlight its incoming and outgoing paths.</p>
+                    <input class="wf-search" type="search" placeholder="Find a state…" aria-label="Find a state" {{ stimulus_target(controller, 'search') }} {{ stimulus_action(controller, 'search', 'input') }}>
                 </div>
-            </div>
-        </div>
-
-        <div class="col-12 col-xl-3">
-            <div class="card workflow-sidebar">
-                <div class="card-header">
-                    <h3 class="card-title mb-0">Places &amp; Transitions</h3>
-                </div>
-                <div class="list-group list-group-flush">
-                    {{ block('places_with_transitions') }}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {# DOT source for the client-side renderer (and a quick debug peek) #}
-    <pre id="digraphSource" class="d-none">{{ digraphData|raw }}</pre>
-    {% if isDebug %}
-        <pre class="mt-3">{{ digraphData }}</pre>
-    {% endif %}
-{% endblock %}
-
-{% block places_with_transitions %}
-    {% for place in definition.places %}
-        {% set placeLabel = survos_workflow_metadata(flowCode, 'label', place) %}
-        {% set placeDescription = survos_workflow_metadata(flowCode, 'description', place) %}
-        {% set transitions = definition.transitions|filter((t) => place in t.froms) %}
-        <div class="list-group-item">
-            <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-blue-lt">{{ place }}</span>
-                {% if placeLabel %}<strong>{{ placeLabel }}</strong>{% endif %}
-                <a class="ms-auto small text-secondary hidden-print"
-                   href="{{ path('survos_workflow', {flowCode: flowCode, states: place|json_encode}) }}">Set</a>
-            </div>
-            {% if placeDescription %}
-                <div class="text-secondary small mt-1">{{ placeDescription }}</div>
-            {% endif %}
-
-            {% if transitions %}
-                <ul class="list-unstyled mt-2 mb-0 ps-2 border-start">
-                    {% for t in transitions %}
-                        {% set transitionLabel = survos_workflow_metadata(flowCode, 'label', t) %}
-                        {% set transitionDescription = survos_workflow_metadata(flowCode, 'description', t) %}
-                        {% set rp = {commandName: iterateCommand, transition: t.name, marking: place} %}
-                        {% if app.request.query.get('className') %}
-                            {% set rp = rp|merge({className: app.request.query.get('className')}) %}
-                        {% endif %}
-                        <li class="mb-1">
-                            <i class="fas fa-play text-muted me-1"></i>
-                            {% if commandRouteExists|default(false) %}
-                                <a class="fw-bold" href="{{ path('survos_command', rp) }}" title="{{ t.name }}">
-                                    {{ transitionLabel ?: t.name }}
-                                </a>
-                            {% else %}
-                                <span class="fw-bold" title="{{ t.name }}">{{ transitionLabel ?: t.name }}</span>
-                            {% endif %}
-                            <span class="badge bg-azure-lt ms-1">{{ t.tos|join(', ') }}</span>
-                            {% if transitionDescription %}
-                                <div class="text-secondary small">{{ transitionDescription }}</div>
-                            {% endif %}
-                        </li>
+                <div class="wf-places">
+                    {% for place in definition.places %}
+                        {% set label = survos_workflow_metadata(flowCode, 'label', place) ?: place|replace({'_': ' '})|title %}
+                        {% set description = survos_workflow_metadata(flowCode, 'description', place) %}
+                        {% set transitions = definition.transitions|filter(t => place in t.froms) %}
+                        <div class="wf-place-row" data-place="{{ place }}" {{ stimulus_target(controller, 'place') }}>
+                            <button class="wf-place" type="button" data-place="{{ place }}" {{ stimulus_action(controller, 'select') }} aria-pressed="false">
+                                {{ label }}
+                                {% if place in definition.initialPlaces %}<span class="wf-tag wf-tag-start">Start</span>{% elseif transitions is empty %}<span class="wf-tag">Terminal</span>{% endif %}
+                            </button>
+                            <span class="wf-code">{{ place }}</span>
+                            <div class="wf-details" hidden>
+                                {% if description %}<p class="wf-description">{{ description }}</p>{% endif %}
+                                {% for t in transitions %}
+                                    <div class="wf-transition"><strong>{{ survos_workflow_metadata(flowCode, 'label', t) ?: t.name|replace({'_': ' '})|title }}</strong> → {{ t.tos|join(', ')|replace({'_': ' '}) }}
+                                        {% set transitionDescription = survos_workflow_metadata(flowCode, 'description', t) %}
+                                        {% if transitionDescription %}<small>{{ transitionDescription }}</small>{% endif %}
+                                        {% if commandRouteExists|default(false) %}<a href="{{ path('survos_command', {commandName: 'state:iterate', transition: t.name, marking: place}) }}">View command</a>{% endif %}
+                                    </div>
+                                {% else %}<p class="wf-description">No outgoing transitions.</p>{% endfor %}
+                            </div>
+                        </div>
                     {% endfor %}
-                </ul>
-            {% endif %}
-        </div>
-    {% endfor %}
-{% endblock %}
-{% block places %}
-<h3>{{ flowCode }} States</h3>
-<ul class="list list-unstyled">
-
-    {% for place in definition.places|filter( (place) => not (place in definition.initialPlaces) ) %}
-        <li><b>{{ place }}</b>:
-            <i>
-                {{ workflow_metadata(entity, 'description', place, flowCode) ? workflow_metadata(entity, 'description', place, flowCode)|trans : '' }}
-            </i>
-            <a class="hidden-print" href="{{ path('survos_workflow', {flowCode: flowCode, class: class, states: place|json_encode}) }}">Set</a>
-        </li>
-    {% endfor %}
-
-</ul>
-{% endblock %}
-
-{% block transitions %}
-<h3>{{ flowCode }} Transitions</h3>
-<ul class="list list-unstyled">
-    {% for t in definition.transitions %}
-        <li>
-            <i>{{ t.name }}</i>
-            <span class="pull-right">
-                                {{ t.froms|join(',') }}
-                                <i class="fa fa-arrow-circle-right"></i>
-                -> {{ t.tos|join(',') }}
-                            </span>
-            <br />
-            {{ workflow_metadata(entity, 'description', t, flowCode)  }}
-        </li>
-    {% endfor %}
-</ul>
-{% endblock %}
-
-{% block debug_body %}
-
-    <div id="diagram-target">
-        #diagram-target
-    </div>
-
-
-    <div
-{#            {{ stimulus_controller('workflow', {#}
-{#                    digraph: workflow_digraph(entity, flowCode, 'LR')#}
-{#}) }}#}
-
-    >
-
-                     Diagraph Div.
-
-        <div id="itree" data-workflow-target="diagram">
-            Instance
-            <span class="fas fa-spinner fa-5x"></span>
-        </div>
-
-    </div>
-
-    <div id="digraph" class="digraph" >
-        {{ workflow_digraph(entity, flowCode, 'LR')|raw }}
-    </div>
-    <pre style="display: none;">
-    </pre>
-
-        <pre>
-        {{  workflow_digraph(entity, flowCode, 'LR') }}
-        </pre>
-    <div id="graphxx" style="text-align: center; width: 100% " >
-    </div>
-
-    {% set article = entity %}
-    <div class="row row-fluid">
-        <div class="col-md-6 col-6">
-            <div id="diagram-target">
-                #graph
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            {{ block('places') }}
-        </div>
-
-        <div class="col-md-3">
-            {{ block('transitions') }}
-        </div>
-
-    </div>
-
-    <h1>Article "{{ article }}"</h1>
-    <div class="row">
-        <div class="col-md-3">
-            <h2>Current Marking</h2>
-            <p>
-                <code>
-                    AppBundle\Entity\Article::marking
-                </code>
-                <br />
-                =
-                <br />
-                <code>{{ article.marking|keys|join('</code>, <code>')|default('[]')|raw }}</code>
-            </p>
-
-            <form action="{{ path('survos_workflow', {id: article.id}) }}" method="post" class="form-inline">
-                <button type="submit" class="btn btn-danger btn-xs">Reset marking</button>
-            </form>
-        </div>
-        <div class="col-md-3">
-            <h2>What can you do?</h2>
-
-            <form xxxaction="{{ path('survos_workflow', {id: article.id}) }}" method="get">
-                <div class="btn-group-vertical" role="group">
-                    {% for transition in workflow_transitions(article, flowCode) %}
-                        <button type="submit" name="transition" value="{{ transition.name }}"
-                                {% if workflow_can(article, transition.name, flowCode) -%}
-                                    class="btn btn-primary"
-                                {%- else -%}
-                                    class="btn btn-danger" disabled="disabled"
-                                {%- endif -%}
-                        >
-                            {{ transition.name }}
-                        </button>
-                    {% endfor %}
+                    <p class="wf-status" {{ stimulus_target(controller, 'empty') }} hidden>No matching states.</p>
                 </div>
-            </form>
-            <br />
-            {% if not workflow_transitions(article, flowCode) %}
-                <strong>The article can not apply any transition.</strong>
-                <br />
-                May be you can try with another user ;
-                she may have more permissions than you.
-            {% endif %}
-        </div>
-        <div class="col-md-3">
-            <h2>Why you can't?</h2>
-            <ul class="list-unstyled">
-                {% for transition in workflow_transitions(article, flowCode) %}
-                    {% if not workflow_can(article, transition.name, flowCode) %}
-                        <li>
-                            <strong>{{ transition.name }}</strong>:
-                            <ul class="list-unstyled">
-                                {% for blocker in workflow_transition_blockers(article, transition.name, flowCode) %}
-                                    <li>
-                                        {{ blocker.message }}
-                                        {% if blocker.parameters.expression is defined %}
-                                            <code>{{ blocker.parameters.expression }}</code>
-                                        {% endif %}
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        </li>
-                    {% endif %}
-                {% endfor %}
-            </ul>
-        </div>
-        <div class="col-md-3">
-            <h2>Metadata</h2>
-            <p>
-
-                <strong>Workflow {{ flowCode }}</strong>:<br >
-                <code>{{ workflow_metadata(article, 'title', null, flowCode) }}</code>
-            </p>
-            <p>
-                <strong>Current place(s)</strong>
-            <ul>
-                {% for place in workflow_marked_places(article, true, flowCode) %}
-                    <li>
-                        {{ place }}:
-                        <code>{{ workflow_metadata(article, 'title', place, flowCode) ?: 'n-a'}}</code>
-                    </li>
-                {% endfor %}
-            </ul>
-            </p>
-            <p>
-                <strong>Enabled transition(s)</strong>
-            <ul>
-                {% for transition in workflow_transitions(article, flowCode) %}
-                    <li>
-                        {{ transition.name }}:
-                        <code>{{ workflow_metadata(article, 'title', transition, flowCode) ?: 'n-a'}}</code>
-                    </li>
-                {% endfor %}
-            </ul>
-            </p>
+            </aside>
         </div>
     </div>
+    {% if app.request.query.get('debug', false) %}<pre class="mt-3">{{ digraphData }}</pre>{% endif %}
 {% endblock %}

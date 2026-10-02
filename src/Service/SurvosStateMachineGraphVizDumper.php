@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 
 namespace Survos\StateBundle\Service;
@@ -60,17 +61,29 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
         $places = [];
 
         foreach ($definition->getPlaces() as $place) {
-            $attributes = [];
+            $attributes = ['shape' => 'box', 'style' => 'rounded,filled', 'fillcolor' => '#ffffff', 'color' => '#cbd5e1', 'fontcolor' => '#243247', 'penwidth' => '1.4'];
+            $hasOutgoing = false;
+            foreach ($definition->getTransitions() as $transition) {
+                if (\in_array($place, $transition->getFroms(), true)) {
+                    $hasOutgoing = true;
+                    break;
+                }
+            }
+            if (!$hasOutgoing) {
+                $attributes['fillcolor'] = '#f1f5f9';
+                $attributes['peripheries'] = '2';
+            }
             if (\in_array($place, $definition->getInitialPlaces(), true)) {
-                $attributes['style'] = 'filled';
+                $attributes['style'] = 'rounded,filled';
             }
             if ($marking?->has($place)) {
-                $attributes['color'] = '#FF0000';
-                $attributes['shape'] = 'doublecircle';
+                $attributes['color'] = '#2563eb';
+                $attributes['fillcolor'] = '#eff6ff';
+                $attributes['penwidth'] = '2';
             }
-            $backgroundColor = $workflowMetadata->getMetadata('bg_color', $place);
+            $backgroundColor = $workflowMetadata->getMetadata('bgColor', $place) ?? $workflowMetadata->getMetadata('bg_color', $place);
             if (null !== $backgroundColor) {
-                $attributes['style'] = 'filled';
+                $attributes['style'] = 'rounded,filled';
                 $attributes['fillcolor'] = $backgroundColor;
             }
             $label = $workflowMetadata->getMetadata('label', $place);
@@ -134,7 +147,7 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
         foreach ($definition->getTransitions() as $transition) {
             $attributes = [];
 
-            $transitionName = $workflowMetadata->getMetadata('label', $transition) ?? $transition->getName();
+            $transitionName = $workflowMetadata->getMetadata('label', $transition) ?? ucwords(str_replace('_', ' ', $transition->getName()));
 
             $labelColor = $workflowMetadata->getMetadata('color', $transition);
             if (null !== $labelColor) {
@@ -177,7 +190,7 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
                     $this->dotize($id),
                     $this->dotize($edge['to']),
                     $this->escape($edge['name']),
-                    'dotted',
+                    'solid',
                     $this->addAttributes($edge['attributes'])
                 );
             }
@@ -195,7 +208,7 @@ protected function addPlaces(array $places): string
             $placeName = $place['attributes']['name'];
             unset($place['attributes']['name']);
         } else {
-            $placeName = $id;
+            $placeName = ucwords(str_replace('_', ' ', $id));
         }
 
         if (isset($place['attributes']['shape'])) {
