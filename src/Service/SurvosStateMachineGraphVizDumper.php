@@ -160,11 +160,18 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
             // full description shows on hover (graphviz emits it as an SVG xlink:title)
             $description = $workflowMetadata->getMetadata('description', $transition);
             $attributes['tooltip'] = $this->normalizeTooltip($description ?? $transitionName);
+            $guard = $workflowMetadata->getMetadata('guard', $transition);
+            if (is_string($guard) && $guard !== '') {
+                $attributes['tooltip'] .= ' — Guard: '.$this->normalizeTooltip($guard);
+            }
+
 
             foreach ($transition->getFroms() as $from) {
                 foreach ($transition->getTos() as $to) {
                     $edge = [
                         'name' => $transitionName,
+                        'guard' => is_string($guard) ? $guard : '',
+                        'guardLabel' => $workflowMetadata->getMetadata('guardLabel', $transition),
                         'to' => $to,
                         'attributes' => $attributes,
                     ];
@@ -186,10 +193,10 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
         foreach ($edges as $id => $edges) {
             foreach ($edges as $edge) {
                 $code .= sprintf(
-                    "  place_%s -> place_%s [label=\"%s\" style=\"%s\"%s];\n",
+                    "  place_%s -> place_%s [label=%s style=\"%s\"%s];\n",
                     $this->dotize($id),
                     $this->dotize($edge['to']),
-                    $this->escape($edge['name']),
+                    $this->edgeLabel($edge['name'], $edge['guard'], $edge['guardLabel']),
                     'solid',
                     $this->addAttributes($edge['attributes'])
                 );
@@ -231,6 +238,39 @@ protected function addPlaces(array $places): string
 
     return $code;
 }
+
+    private function edgeLabel(string $name, string $guard, ?string $guardLabel = null): string
+    {
+        if ($guard === '') {
+            return '"'.$this->escape($name).'"';
+        }
+
+        // Keep quoted values intact: operator words and subject. can be literal data.
+        $quotedStrings = <<<'REGEX'
+/('[^'\\]*(?:\\.[^'\\]*)*'|"[^"\\]*(?:\\.[^"\\]*)*")/s
+REGEX;
+        $parts = preg_split($quotedStrings, $guard, -1, PREG_SPLIT_DELIM_CAPTURE);
+        foreach ($parts as $index => &$part) {
+            if ($index % 2 === 1) {
+                continue;
+            }
+            $part = preg_replace('/\bsubject\./', '', $part);
+            $part = preg_replace('/\bnot\s+(?!in\b)/', '!', $part);
+            $part = preg_replace('/\band\b/', '&&', $part);
+            $part = preg_replace('/\bor\b/', '||', $part);
+            $part = preg_replace('/\s+/', ' ', $part);
+            $part = preg_replace('/\s*(===|!==|==|!=|<=|>=|<|>)\s*/', '$1', $part);
+            $part = preg_replace('/\s*(&&|\|\|)\s*/', "\n$1 ", $part);
+        }
+        unset($part);
+        $compact = ($guardLabel !== null && trim($guardLabel) !== ''
+            ? wordwrap(trim($guardLabel), 32, "\n")
+            : trim(implode('', $parts)));
+        $html = static fn (string $text): string => htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+        return '<'.$html($name).'<BR/><FONT POINT-SIZE="9" COLOR="#64748b"><I>'
+            .str_replace("\n", '<BR ALIGN="LEFT"/>', $html($compact)).'</I></FONT>>';
+    }
 
     protected function escape(string|bool $value): string
     {

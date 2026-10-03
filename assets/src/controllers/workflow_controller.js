@@ -102,6 +102,7 @@ export default class extends Controller {
         for (const name of ['pointerup', 'pointercancel', 'pointerleave']) {
             target.addEventListener(name, () => { this.drag = null; }, options);
         }
+        target.addEventListener('wheel', event => this.wheelZoom(event), { ...options, passive: false });
         this.clear();
     }
 
@@ -150,7 +151,7 @@ export default class extends Controller {
         });
         if (this.hasSearchTarget) this.searchTarget.value = '';
         this.search();
-        if (this.hasStatusTarget) this.statusTarget.textContent = 'Select a state to trace its connections · Drag to pan';
+        if (this.hasStatusTarget) this.statusTarget.textContent = 'Select a state to trace its connections · Drag to pan · Option/Alt + scroll or pinch to zoom';
     }
 
     search() {
@@ -166,12 +167,24 @@ export default class extends Controller {
 
     zoomIn() { this.zoom(0.8); }
     zoomOut() { this.zoom(1.25); }
-    zoom(factor) {
+    wheelZoom(event) {
+        // Trackpad pinch arrives as Ctrl+wheel. Option/Alt+scroll leaves ordinary page scrolling available.
+        if (!event.ctrlKey && !event.altKey) return;
+        event.preventDefault();
+        const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.svg.clientHeight : 1;
+        const delta = Math.max(-100, Math.min(100, event.deltaY * unit));
+        const matrix = this.svg.getScreenCTM();
+        if (!matrix) return;
+        const anchor = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+        this.zoom(Math.exp(delta * 0.01), anchor);
+    }
+    zoom(factor, anchor = null) {
         if (!this.svg) return;
         const [x, y, width, height] = this.viewBox;
         const nextWidth = width * factor;
         if (nextWidth < this.initialViewBox[2] / 5 || nextWidth > this.initialViewBox[2] * 2) return;
-        this.viewBox = [x + (width - nextWidth) / 2, y + (height - height * factor) / 2, nextWidth, height * factor];
+        const focus = anchor ?? { x: x + width / 2, y: y + height / 2 };
+        this.viewBox = [focus.x + (x - focus.x) * factor, focus.y + (y - focus.y) * factor, nextWidth, height * factor];
         this.applyViewBox();
     }
     fit() {

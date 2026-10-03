@@ -19,6 +19,6 @@ final class TestAssetWorkflowDefinition
     #[Place(info: 'Remove', bgColor: 'danger')]
     public const PLACE_REMOVE = 'remove';
 
-    #[Transition(from: [self::PLACE_NEW], to: self::PLACE_REMOVE, info: 'Remove it')]
+    #[Transition(from: [self::PLACE_NEW], to: self::PLACE_REMOVE, info: 'Remove it', guard: 'true', guardLabel: 'Always allowed')]
     public const TRANSITION_REMOVE = 'remove';
 }

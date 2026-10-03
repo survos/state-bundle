@@ -47,6 +47,8 @@
         .wf-transition { margin-top: 10px; padding-top: 10px; border-top: 1px solid #dce6f4; font-size: 11px; }
         .wf-transition strong { color: #334d70; }
         .wf-transition small { display: block; margin-top: 3px; color: var(--wf-muted); }
+        .wf-guard { margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: #f1f5f9; }
+        .wf-guard code { display: block; margin-top: 4px; font-size: 10px; color: #334d70; white-space: pre-wrap; overflow-wrap: anywhere; }
         .wf-status { padding: 22px; color: var(--wf-muted); }
         @media (max-width: 1000px) { .wf-layout { grid-template-columns: 1fr; } .wf-places { max-height: 350px; } .wf-graph { height: 60vh; min-height: 400px; } }
         @media (prefers-reduced-motion: reduce) { .wf-graph g.node, .wf-graph g.edge { transition: none; } }
@@ -72,11 +74,11 @@
                 </div>
                 <footer class="wf-footer">
                     <div class="wf-legend"><span><i class="wf-key wf-key-start"></i>Start</span><span><i class="wf-key"></i>State</span><span><i class="wf-key wf-key-end"></i>Terminal</span></div>
-                    <span {{ stimulus_target(controller, 'status') }} role="status" aria-live="polite">Select a state to trace its connections · Drag to pan</span>
+                    <span {{ stimulus_target(controller, 'status') }} role="status" aria-live="polite">Select a state to trace its connections · Drag to pan · Option/Alt + scroll or pinch to zoom</span>
                 </footer>
             </section>
             <aside class="wf-sidebar" aria-label="Workflow states">
-                <div class="wf-sidebar-head"><h3>Explore states</h3><p class="wf-hint">Select a state to highlight its incoming and outgoing paths.</p>
+                <div class="wf-sidebar-head"><h3>Explore states</h3><p class="wf-hint">Select a state to see its paths and the guard expressions that allow each transition.</p>
                     <input class="wf-search" type="search" placeholder="Find a state…" aria-label="Find a state" {{ stimulus_target(controller, 'search') }} {{ stimulus_action(controller, 'search', 'input') }}>
                 </div>
                 <div class="wf-places">
@@ -96,6 +98,8 @@
                                     <div class="wf-transition"><strong>{{ survos_workflow_metadata(flowCode, 'label', t) ?: t.name|replace({'_': ' '})|title }}</strong> → {{ t.tos|join(', ')|replace({'_': ' '}) }}
                                         {% set transitionDescription = survos_workflow_metadata(flowCode, 'description', t) %}
                                         {% if transitionDescription %}<small>{{ transitionDescription }}</small>{% endif %}
+                                        {% set guard = survos_workflow_metadata(flowCode, 'guard', t) %}
+                                        {% if guard %}<div class="wf-guard"><span class="wf-eyebrow">{{ survos_workflow_metadata(flowCode, 'guardLabel', t)|default('Guard') }}</span><code>{{ guard }}</code></div>{% endif %}
                                         {% if commandRouteExists|default(false) %}<a href="{{ path('survos_command', {commandName: 'state:iterate', transition: t.name, marking: place}) }}">View command</a>{% endif %}
                                     </div>
                                 {% else %}<p class="wf-description">No outgoing transitions.</p>{% endfor %}

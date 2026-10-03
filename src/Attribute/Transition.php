@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\StateBundle\Attribute;
 
 use Attribute;
@@ -26,7 +28,11 @@ class Transition
          * BatchTransitionHandler.
          */
         public ?int $batch=null,
+        public ?string $guardLabel=null,
     ) {
+        if ($guardLabel !== null) {
+            $this->metadata['guardLabel'] = $guardLabel;
+        }
         if ($guard) {
             $this->metadata['guard'] = $guard;
         }

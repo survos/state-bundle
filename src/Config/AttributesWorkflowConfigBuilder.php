@@ -17,7 +17,7 @@ use Survos\StateBundle\Attribute\Transition as TransAttr;
  * Scans workflow definition files (classes/interfaces/traits with attributes) and
  * builds a framework.workflows config payload. Ensures:
  *  - Place metadata is attached PER PLACE (so Symfony's MetadataStore populates placesMetadata)
- *  - Transition guard stays at top-level (not duplicated in metadata)
+ *  - Transition guard stays at top-level for execution and in metadata for documentation
  *  - Async transitions are tracked for external wiring (Messenger, etc.)
  *
  * Returns:
@@ -165,9 +165,9 @@ final class AttributesWorkflowConfigBuilder
                         $md = $t->metadata;
                     }
 
-                    // Do not duplicate guard in metadata
-                    if (isset($md['guard'])) {
-                        unset($md['guard']);
+                    // Symfony executes the top-level guard; diagrams read its metadata copy.
+                    if (isset($item['guard'])) {
+                        $md['guard'] = $item['guard'];
                     }
 
                     // Normalize async and track
