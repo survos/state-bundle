@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace Survos\StateBundle\Compiler;
 
 use Survos\StateBundle\Messenger\Middleware\BatchTransitionMiddleware;
+use Survos\StateBundle\Messenger\Middleware\ContextStampingMiddleware;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
- * Puts BatchTransitionMiddleware on every message bus, just before send_message.
+ * Puts BatchTransitionMiddleware and ContextStampingMiddleware on every message bus, just before
+ * send_message. (ContextStampingMiddleware used to carry a bare `messenger.middleware` tag, which
+ * meant "every bus" until Symfony 8.2 rejected tags without a `bus` attribute.)
  *
  * Why a compiler pass and not a prepended `framework.messenger.buses.*.middleware`: that node does
  * not deep-merge, so every bundle that prepends it REPLACES the others' lists and one wins.
@@ -22,20 +25,26 @@ final class BatchTransitionMiddlewarePass implements CompilerPassInterface
 {
     public function process(ContainerBuilder $container): void
     {
-        if (!$container->hasDefinition(BatchTransitionMiddleware::class)) {
-            return;
+        foreach ([BatchTransitionMiddleware::class, ContextStampingMiddleware::class] as $class) {
+            if ($container->hasDefinition($class)) {
+                $this->addToBuses($container, $class);
+            }
         }
+    }
+
+    private function addToBuses(ContainerBuilder $container, string $class): void
+    {
         foreach (array_keys($container->findTaggedServiceIds('messenger.bus')) as $busId) {
             $param = $busId . '.middleware';
             if (!$container->hasParameter($param)) {
                 continue;
             }
             $middleware = $container->getParameter($param);
-            if (in_array(BatchTransitionMiddleware::class, array_column($middleware, 'id'), true)) {
+            if (in_array($class, array_column($middleware, 'id'), true)) {
                 continue;
             }
             $at = array_search('send_message', array_column($middleware, 'id'), true);
-            array_splice($middleware, $at === false ? \count($middleware) : $at, 0, [['id' => BatchTransitionMiddleware::class, 'arguments' => []]]);
+            array_splice($middleware, $at === false ? \count($middleware) : $at, 0, [['id' => $class, 'arguments' => []]]);
             $container->setParameter($param, $middleware);
         }
     }

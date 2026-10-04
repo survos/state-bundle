@@ -224,8 +224,8 @@ final class SurvosStateBundle extends AbstractUxBundle
 
 
         // middleware
-        $services->set(ContextStampingMiddleware::class)
-            ->tag('messenger.middleware');
+        // Put on every bus by BatchTransitionMiddlewarePass; no tag (8.2 requires `bus` on it).
+        $services->set(ContextStampingMiddleware::class);
 
         // explicit failure listener (you already had this)
         $services->set(LogMessageFailureListener::class)
