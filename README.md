@@ -175,3 +175,35 @@ under `@survos/state-bundle` in `assets/controllers.json`.
 The diagram mounts through Stimulus, including after Turbo navigation. Rendering
 errors display a message instead of leaving an empty card; places and transitions
 remain available beside the diagram.
+
+### Guard labels and diagram navigation
+
+Use `guardLabel` on a transition to explain its guard in plain language:
+
+```php
+#[Transition(
+    from: self::PLACE_PHP_OKAY,
+    to: self::PLACE_SYMFONY_OKAY,
+    guard: "subject.type == 'symfony-bundle' and subject.hasValidSymfonyVersion",
+    guardLabel: 'Symfony 8 compatible bundle',
+)]
+public const TRANSITION_SYMFONY_OKAY = 'symfony_okay';
+```
+
+The diagram displays the label in italics beneath the transition name. If no label
+is supplied, it falls back to a compact expression: `subject.` is omitted and
+logical operators use `&&`, `||`, and `!`. Neither presentation changes the guard
+that Symfony evaluates. The original expression remains available on hover and
+in the selected state's transition details. Keep labels accurate when changing
+expressions; labels are documentation, not executable conditions.
+
+The attribute config builder retains the guard at the top level for execution
+and copies it into transition metadata for the diagram. `guardLabel` is metadata
+only.
+
+Select a state to highlight its incoming and outgoing paths, or filter the state
+list to find it. Drag the diagram to pan. Hold **Option on Mac / Alt elsewhere**
+while scrolling to zoom around the pointer; trackpad pinch is supported through
+Ctrl+wheel events. Ordinary scrolling still scrolls the page. The **+ / −** buttons
+zoom around the center, **Fit** restores the original view, and **Show all** clears
+the selected state and filter.
