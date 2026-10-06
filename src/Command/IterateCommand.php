@@ -24,6 +24,7 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
+use Symfony\Component\Workflow\Marking;
 use Symfony\Component\Workflow\Transition;
 use Symfony\Component\Workflow\WorkflowInterface;
 use Zenstruck\Alias;
@@ -71,6 +72,7 @@ final class IterateCommand
         #[Option('limit the number of records')] int $limit = 0,
         #[Option('Use this count for progress bar', shortcut: 'c')] int $count = 0,
         #[Option('Entity manager name')] ?string $em = null,
+        #[Option('Set this marking on each selected row first, bypassing the workflow (debugging, resets); -t then runs from it')] ?string $setMarking = null,
     ): int {
         // --limit shim
 //        if ($limit) {
@@ -171,13 +173,20 @@ final class IterateCommand
                 $selectedMarkings = [$marking];
             }
 
+            if ($setMarking !== null && !in_array($setMarking, $places, true)) {
+                $io->error("Invalid --set-marking: {$setMarking}\nValid markings are:\n - " . implode("\n - ", $places));
+                return Command::FAILURE;
+            }
+            // The transition runs from the marking each row will HAVE, not the one it was selected by.
+            $transitionFroms = $setMarking !== null ? [$setMarking] : $selectedMarkings;
+
             // Pick transition (if not provided). $marking may be a comma-separated list (e.g.
             // "raw,normalized,enriched,folio" to re-trigger regardless of current state) — match
             // against any of the selected markings, not the raw unsplit string (which never
             // equals a single place name and used to make every multi-marking -t lookup fail).
             $transitions = [];
             foreach ($workflow->getDefinition()->getTransitions() as $t) {
-                if (array_intersect($selectedMarkings, $t->getFroms()) !== []) {
+                if (array_intersect($transitionFroms, $t->getFroms()) !== []) {
                     $help = $this->wfTransitionDescription($workflow, $t) ?? $t->getName();
                     if ($guard = $this->wfTransitionGuard($workflow, $t)) {
                         $help .= " (if: {$guard})";
@@ -188,13 +197,16 @@ final class IterateCommand
 
             if ($transition) {
                 if (!array_key_exists($transition, $transitions)) {
-                    $io->error("Invalid transition: {$transition}\nValid from '{$marking}':\n - " . implode("\n - ", array_keys($transitions)));
+                    $io->error("Invalid transition: {$transition}\nValid from '" . implode(',', $transitionFroms) . "':\n - " . implode("\n - ", array_keys($transitions)));
                     return Command::FAILURE;
                 }
-            } else {
+            } elseif ($setMarking === null) {
                 $question = new ChoiceQuestion('Transition?', array_keys($transitions));
                 $transition = $io->askQuestion($question);
             }
+        } elseif ($setMarking !== null) {
+            $io->error(sprintf('--set-marking needs a workflow; %s has none.', $className));
+            return Command::FAILURE;
         }
 
         $io->title($className);
@@ -287,6 +299,21 @@ final class IterateCommand
                     $row[] = substr((string)($value ?? ''), 0, 120);
                 }
                 $table->addRow($row);
+            }
+
+            if ($workflow && $setMarking !== null) {
+                $from = implode(',', array_keys($workflow->getMarking($item)->getPlaces()));
+                $workflow->getMarkingStore()->setMarking($item, new Marking([$setMarking => 1]));
+                $entityManager->flush();
+                $io->writeln(sprintf('  %s: %s -> %s', (string) $key, $from !== '' ? $from : '(none)', $setMarking));
+                if (!$transition) {
+                    $processed++;
+                    $progressBar->advance();
+                    if ($limit && $processed >= $limit) {
+                        break;
+                    }
+                    continue;
+                }
             }
 
             if ($workflow && $transition) {
