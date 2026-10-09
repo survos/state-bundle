@@ -133,7 +133,7 @@ final class StatePrependExtension
                 // places may be associative with metadata; guard it
                 foreach (($def['places'] ?? []) as $placeName => $placeData) {
                     if (is_array($placeData) && isset($placeData['metadata']['next'])) {
-                        $initialTransitions[(string) $placeName] = $placeData['metadata']['next'];
+                        $initialTransitions[(string) $wfName][(string) ($placeData['name'] ?? $placeName)] = $placeData['metadata']['next'];
                     }
                 }
                 foreach ((array) ($def['transitions'] ?? []) as $t) {

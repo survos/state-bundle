@@ -21,7 +21,7 @@ final class WorkflowDiagramTemplateTest extends TestCase
     {
         $transition = new Transition('check', 'new', 'done');
         $guards = new \SplObjectStorage();
-        $guards[$transition] = ['guard' => "subject.type == 'symfony-bundle' and subject.version < 9"];
+        $guards[$transition] = ['async' => true, 'description' => 'Download <metadata>', 'guard' => "subject.type == 'symfony-bundle' and subject.version < 9"];
         $metadata = new InMemoryMetadataStore([], [], $guards);
         $definition = new Definition(['new', 'done'], [$transition], 'new', $metadata);
         $twig = new Environment(new ChainLoader([
@@ -36,6 +36,9 @@ final class WorkflowDiagramTemplateTest extends TestCase
             'flowCode' => 'test', 'definition' => $definition, 'digraph' => 'digraph{}',
             'app' => (object) ['request' => (object) ['query' => new ParameterBag()]],
         ]);
+        self::assertStringContainsString('id="wf-transitions-panel"', $html);
+        self::assertStringContainsString('Download &lt;metadata&gt;', $html);
+        self::assertStringContainsString('<span class="wf-tag">Async</span>', $html);
         self::assertStringContainsString('<div class="wf-guard">', $html);
         self::assertStringContainsString('subject.type == &#039;symfony-bundle&#039; and subject.version &lt; 9', $html);
     }

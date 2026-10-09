@@ -12,6 +12,23 @@ use Symfony\Component\Workflow\Transition;
 
 final class StateMachineDiagramTest extends TestCase
 {
+    public function testAsyncEdgesAreDistinguishedWithoutChangingSynchronousEdges(): void
+    {
+        $download = new Transition('download', 'new', 'downloaded');
+        $process = new Transition('process', 'downloaded', 'done');
+        $metadata = new \SplObjectStorage();
+        $metadata[$download] = ['async' => true, 'guard' => 'subject.allowed'];
+        $metadata[$process] = ['async' => false];
+        $definition = new Definition(['new', 'downloaded', 'done'], [$download, $process], 'new',
+            new \Symfony\Component\Workflow\Metadata\InMemoryMetadataStore([], [], $metadata));
+        $dot = (new SurvosStateMachineGraphVizDumper())->dump($definition);
+
+        self::assertStringContainsString('◷ <I>Download</I><BR/>', $dot);
+        self::assertStringContainsString('style="dashed"', $dot);
+        self::assertStringContainsString('Async: queued for a worker — Guard: subject.allowed', $dot);
+        self::assertStringContainsString('label="Process" style="solid"', $dot);
+    }
+
     public function testTerminalAppearanceFollowsTopology(): void
     {
         $definition = new Definition(['new', 'in_progress', 'done'], [

@@ -1,4 +1,114 @@
-# workflow-helper-bundle
+# Survos State Bundle
+
+`survos/state-bundle` adds attribute-based workflow definitions, queued transitions,
+chaining, commands and visualization to Symfony Workflow.
+
+## Symfony 8.2 roadmap: native attributes and smaller bundles
+
+**We expect to deprecate state-bundle in favor of native Symfony workflow
+attributes plus smaller optional bundles once the replacements are validated and
+have a documented migration path. State-bundle is not deprecated today.**
+Existing applications can continue using its current attributes and services;
+there is no immediate migration requirement or removal date.
+
+Symfony 8.2 is taking over functionality that this bundle previously supplied.
+Our intended direction is to let Symfony own workflow definitions, discovery,
+registration, marking stores, guards and events, and retain only our additional
+behavior. This is a selective extraction, not a copy of state-bundle under a new
+name. String constants remain supported; adopting enums is optional.
+
+### Upstream alignment
+
+Status checked on **9 October 2026**; these links are the source of truth as the
+8.2 development branch evolves:
+
+- [#61935: native workflow attributes](https://github.com/symfony/symfony/pull/61935)
+  is merged: `AsWorkflow`, `Place` and `Transition` define native workflows.
+- [#66722: `Place(initial: true)`](https://github.com/symfony/symfony/pull/66722)
+  is merged, following [our initial-place proposal](https://github.com/symfony/symfony/issues/66701).
+  Explicit `AsWorkflow(initialMarking: ...)` takes precedence.
+- [#66687: extensible workflow attributes](https://github.com/symfony/symfony/pull/66687)
+  is merged. Native `AsWorkflow`, `Place` and `Transition` can now be extended,
+  with subclass discovery and validation rejecting ambiguous multiple workflow/place
+  attributes. No PR patch is needed on a containing 8.2 development revision.
+- [#66726: workflow attribute descriptions](https://github.com/symfony/symfony/issues/66726)
+  is a proposal, not an available API. Today descriptions can be carried in native
+  metadata. Bundle-specific convenience arguments need not become core features.
+
+The target replacements are **Symfony 8.2-only**, starting with exact development
+revisions for compatibility testing. Experimental scaffolds now exist in mono for
+[workflow-async](https://github.com/survos/mono/tree/main/bu/workflow-async-bundle) and
+[workflow-extras](https://github.com/survos/mono/tree/main/bu/workflow-extras-bundle),
+with a locked packages-inspired example. They are not stable replacements yet. A release must require a Symfony version containing
+its necessary upstream changes; merely selecting an arbitrary 8.2 development
+revision does not guarantee attribute extensibility.
+
+### Proposed package boundaries
+
+| Package | Intended responsibility |
+| --- | --- |
+| Symfony Workflow | Native `AsWorkflow`, `Place`, `Transition`, initial marking, definition registration and normal workflow execution. |
+| `survos/workflow-async-bundle` (working name) | Explicitly dispatch transition requests through Messenger; resolve subjects in workers, apply native transitions and select configured transports. Optional transport provisioning is a separate capability. |
+| `survos/workflow-extras-bundle` (working name) | Ordered `next` chaining, workflow iteration commands, metadata conveniences and optional workflow explorer/diagram integration. Delegate queued execution to workflow-async when installed. |
+| `survos/state-bundle` | Continue serving existing applications during migration, preserving current attributes and message compatibility. |
+
+`state:iterate` belongs with workflow extras, not the async execution package.
+Async must be usable without adopting our UI, subject traits, workflow definition
+reader or Doctrine conventions. Shared transports are supported; one queue per
+transition is useful for independent worker limits and retries, but not required.
+
+The async contract is explicit: dispatch queues a request; a worker loads the
+subject and invokes Symfony's workflow, so ordinary transition listeners run in
+the worker. Native `Workflow::apply()` stays synchronous. Messenger delivery is
+at least once, and guards are evaluated against the subject at consumption time.
+Applications still need idempotent external effects and an appropriate
+persistence/transaction strategy; queuing is not an exactly-once guarantee.
+
+### Compatibility work and first migration
+
+Our first pilot is the packages application and its single package workflow:
+fetch package metadata, run inexpensive guarded validation, then fetch the README
+only for valid Symfony 8 bundles. The new standalone example demonstrates metadata
+and README fetching on separate queues; the live packages application has not yet
+been migrated or given a README transition.
+
+Before recommending migration, we need to demonstrate:
+
+- Native definition registration exactly once, with derived attributes discovered
+  correctly and native initial-marking, guard, context and event behavior preserved.
+- Real Messenger enqueue/consume behavior, including stale requests, failures and
+  independent transition routing.
+- A minimal application without FrameworkBundle. Symfony 8.2 provides component-owned
+  WorkflowBundle and MessengerBundle with `workflow:` and `messenger:` configuration;
+  our replacement must not depend on scanning `framework.workflows`.
+- Optional persistence and UI integrations, with the async core working without
+  Doctrine, Twig or Tabler.
+- A migration that preserves workflow/transition names and existing queued message
+  handling until old queues drain. Do not enable both definition registrars for
+  the same workflow.
+
+Validation so far includes [state-bundle's regression tests](tests/) and the upstream
+Workflow component suite after resolving #66687 against the new initial-place
+support, including inherited place metadata and `initial: true`. **This does not
+establish end-to-end 8.2 compatibility for state-bundle.** The new scaffolds add
+a separate minimal-kernel and Messenger worker test suite; production persistence,
+automatic chaining and UI migration remain future work. Native attribute discovery happens during compilation;
+reading raw framework configuration alone will not discover these definitions.
+The current [attribute builder](src/Config/AttributesWorkflowConfigBuilder.php),
+[workflow helper](src/Service/WorkflowHelperService.php) and
+[queue locator](src/Service/AsyncQueueLocator.php) show the existing implementation;
+they are migration inputs, not proof of the proposed package boundaries.
+
+Useful extras may become focused upstream proposals after working examples and
+tests establish their value. When Symfony adopts a capability, the corresponding
+extra can delegate to core and eventually be deprecated. The goal is a smaller
+maintenance surface while keeping application-specific policies outside Symfony.
+
+## Current state-bundle usage
+
+The examples below describe the existing state-bundle API, not the proposed
+8.2 successor APIs. In particular, its `Workflow(initialPlace: ...)` remains
+supported; native Symfony uses `AsWorkflow(initialMarking: ...)`.
 
 Configure a workflow using PHP attributes.  Prefer separating the durable workflow definition from the event listener/orchestrator:
 
@@ -72,6 +182,30 @@ Run them from the bundle root:
 ```bash
 composer install
 vendor/bin/phpunit
+```
+
+## Choosing an initial place
+
+The existing `Workflow` attribute accepts an explicit initial place as a string,
+constant, or string-backed enum case:
+
+```php
+#[Workflow(supports: [Submission::class], initialPlace: self::PLACE_NEW)]
+```
+
+`initialPlace` takes precedence over `#[Place(initial: true)]`. The existing
+`initial` argument remains supported, including arrays for workflows with multiple
+initial places. Supply either `initial` or `initialPlace`, not both. Place-level
+`initial: true` remains supported and is not deprecated.
+
+Symfony 8.2 calls its native workflow option `AsWorkflow(initialMarking: ...)`;
+the Survos `initialPlace` option maps to the workflow configuration's
+`initial_marking`. Enums are optional.
+
+Run the bundle tests from the monorepo root with:
+
+```sh
+vendor/bin/phpunit -c bu/state-bundle/phpunit.xml.dist
 ```
 
 ## Vibing 

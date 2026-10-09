@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Survos\StateBundle\Tests;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Survos\StateBundle\Service\WorkflowHelperService;
@@ -38,8 +39,9 @@ final class WorkflowHelperServiceTest extends TestCase
     {
         return new WorkflowHelperService(
             new ServiceLocator([]),
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(PropertyAccessorInterface::class),
+            $this->createStub(EntityManagerInterface::class),
+            $this->createStub(ManagerRegistry::class),
+            $this->createStub(PropertyAccessorInterface::class),
             [
                 'test_asset' => [
                     'supports' => [TestSubject::class],
@@ -53,7 +55,7 @@ final class WorkflowHelperServiceTest extends TestCase
                     TestSubject::class => [TestAssetWorkflowDefinition::class],
                 ],
             ],
-            $this->createMock(LoggerInterface::class),
+            $this->createStub(LoggerInterface::class),
         );
     }
 }

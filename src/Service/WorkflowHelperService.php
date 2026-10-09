@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\StateBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
@@ -550,36 +552,31 @@ ORDER BY n.nspname, c.relname;");
         // Load + flush on the EM that maps the class (DatasetInfo is on the 'dataset' EM, not default).
         $em = $this->managerRegistry->getManagerForClass($message->getClassName()) ?? $this->entityManager;
         if (!$object = $em->find($message->getClassName(), $message->getId())) {
-            $this->logger->error("Missing $message->id in $message->className");
+            $this->logger?->error("Missing $message->id in $message->className");
             $debugMessage = sprintf("missing entity %s for %s", $message->getClassName(), $message->getId());
             return ['message' => $debugMessage];
         }
 
-        $initialMarking = $object->getMarking(); // @todo: use Marking Service to handle more cases, e.g. ->marking
-//        assert($object, $message);
-        // removed, throw error (above) during testing only.
-        if (!$flowName = $message->getWorkflow()) {
-            // ..
-        }
-
-//        dump($message->getTransitionName(), $message->getClassName(), $message->getId());
-
+        $workflow = $this->getWorkflow($object, $message->getWorkflow());
+        // Read through the configured store; subjects need not expose getMarking().
+        $initialMarking = implode(', ', array_keys($workflow->getMarking($object)->getPlaces()));
         $shortName = new \ReflectionClass($message->getClassName())->getShortName();
         $id = $message->getId();
 
         $transition = $message->getTransitionName();
-        $workflow = $this->getWorkflow($object, $flowName);
         if ($workflow->can($object, $transition)) {
             $marking = $workflow->apply($object, $transition, $message->getContext());
             // is this the best place to flush?  or only if workflow applied
             $em->flush(); // save the marking and any updates (on the class's EM)
         } else {
+            $blockerMessage = 'Transition is not enabled.';
             foreach ($workflow->buildTransitionBlockerList($object, $transition) as $blocker) {
-                $this->logger->info($blocker->getMessage());
+                $blockerMessage = $blocker->getMessage();
+                $this->logger?->info($blockerMessage);
             }
             return [
                 'info' => "cannot $transition $shortName::$id ",
-                'message' => $blocker->getMessage(),
+                'message' => $blockerMessage,
                 'initialMarking' => $initialMarking,
                 'class' => $message->getClassName(),
             ];

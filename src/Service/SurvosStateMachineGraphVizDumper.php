@@ -148,6 +148,7 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
             $attributes = [];
 
             $transitionName = $workflowMetadata->getMetadata('label', $transition) ?? ucwords(str_replace('_', ' ', $transition->getName()));
+            $async = $workflowMetadata->getMetadata('async', $transition) === true;
 
             $labelColor = $workflowMetadata->getMetadata('color', $transition);
             if (null !== $labelColor) {
@@ -160,6 +161,9 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
             // full description shows on hover (graphviz emits it as an SVG xlink:title)
             $description = $workflowMetadata->getMetadata('description', $transition);
             $attributes['tooltip'] = $this->normalizeTooltip($description ?? $transitionName);
+            if ($async) {
+                $attributes['tooltip'] .= ' — Async: queued for a worker';
+            }
             $guard = $workflowMetadata->getMetadata('guard', $transition);
             if (is_string($guard) && $guard !== '') {
                 $attributes['tooltip'] .= ' — Guard: '.$this->normalizeTooltip($guard);
@@ -170,6 +174,7 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
                 foreach ($transition->getTos() as $to) {
                     $edge = [
                         'name' => $transitionName,
+                        'async' => $async,
                         'guard' => is_string($guard) ? $guard : '',
                         'guardLabel' => $workflowMetadata->getMetadata('guardLabel', $transition),
                         'to' => $to,
@@ -196,8 +201,8 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
                     "  place_%s -> place_%s [label=%s style=\"%s\"%s];\n",
                     $this->dotize($id),
                     $this->dotize($edge['to']),
-                    $this->edgeLabel($edge['name'], $edge['guard'], $edge['guardLabel']),
-                    'solid',
+                    $this->edgeLabel($edge['name'], $edge['guard'], $edge['guardLabel'], $edge['async']),
+                    $edge['async'] ? 'dashed' : 'solid',
                     $this->addAttributes($edge['attributes'])
                 );
             }
@@ -239,10 +244,12 @@ protected function addPlaces(array $places): string
     return $code;
 }
 
-    private function edgeLabel(string $name, string $guard, ?string $guardLabel = null): string
+    private function edgeLabel(string $name, string $guard, ?string $guardLabel = null, bool $async = false): string
     {
+        $html = static fn (string $text): string => htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $title = $async ? '◷ <I>'.$html($name).'</I>' : $html($name);
         if ($guard === '') {
-            return '"'.$this->escape($name).'"';
+            return $async ? '<'.$title.'>' : '"'.$this->escape($name).'"';
         }
 
         // Keep quoted values intact: operator words and subject. can be literal data.
@@ -266,9 +273,7 @@ REGEX;
         $compact = ($guardLabel !== null && trim($guardLabel) !== ''
             ? wordwrap(trim($guardLabel), 32, "\n")
             : trim(implode('', $parts)));
-        $html = static fn (string $text): string => htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-
-        return '<'.$html($name).'<BR/><FONT POINT-SIZE="9" COLOR="#64748b"><I>'
+        return '<'.$title.'<BR/><FONT POINT-SIZE="9" COLOR="#64748b"><I>'
             .str_replace("\n", '<BR ALIGN="LEFT"/>', $html($compact)).'</I></FONT>>';
     }
 

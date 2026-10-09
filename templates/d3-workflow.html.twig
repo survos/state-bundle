@@ -5,7 +5,7 @@
     {{ parent() }}
     <style>
         .wf-explorer { --wf-blue: #2563eb; --wf-ink: #243247; --wf-muted: #64748b; color: var(--wf-ink); }
-        .wf-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; }
+        .wf-layout { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 18px; }
         .wf-canvas, .wf-sidebar { border: 1px solid #dce3ec; border-radius: 16px; background: #fff; overflow: hidden; box-shadow: 0 3px 12px #24324706; }
         .wf-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px 20px; border-bottom: 1px solid #e8edf3; }
         .wf-eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: 10px; font-weight: 700; color: var(--wf-muted); }
@@ -26,11 +26,18 @@
         .wf-graph .wf-connected path { stroke: #2563eb; stroke-width: 2; }
         .wf-graph .wf-connected polygon { fill: #2563eb; stroke: #2563eb; }
         .wf-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 13px 20px; border-top: 1px solid #e8edf3; font-size: 11px; color: var(--wf-muted); }
-        .wf-legend { display: flex; gap: 14px; align-items: center; }
+        .wf-legend { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+        .wf-key-async { display: inline-block; width: 18px; border-top: 2px dashed currentColor; margin-right: 5px; vertical-align: middle; }
         .wf-key { display: inline-block; width: 10px; height: 10px; border: 1px solid #cbd5e1; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
         .wf-key-start { background: #eff6ff; border-color: #2563eb; }
         .wf-key-end { background: #f1f5f9; border: 3px double #64748b; }
         .wf-sidebar { align-self: start; }
+        .wf-transition-table { font-size: 12px; table-layout: fixed; width: 100%; }
+        .wf-transition-table th:first-child { width: 65%; }
+        .wf-transition-table td { white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+        .wf-transition-table .wf-description { margin-top: 6px; }
+        .wf-transition-table code { white-space: pre-wrap; overflow-wrap: anywhere; }
+        .wf-transition-list { max-height: 65vh; overflow-y: auto; }
         .wf-sidebar-head { padding: 20px; border-bottom: 1px solid #e8edf3; }
         .wf-sidebar-head h3 { font-size: 15px; margin: 0 0 6px; }
         .wf-hint { color: var(--wf-muted); font-size: 12px; line-height: 1.6; margin: 0; }
@@ -43,6 +50,7 @@
         .wf-tag { margin-left: auto; flex-shrink: 0; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #64748b; background: #f1f5f9; border-radius: 4px; padding: 2px 5px; }
         .wf-tag-start { color: #1d4ed8; background: #dbeafe; }
         .wf-code { display: block; margin: 4px 0 0; font-size: 10px; color: #8996a8; overflow-wrap: anywhere; }
+        .wf-next { display: block; margin-top: 7px; font-size: 11px; color: #334d70; white-space: normal; overflow-wrap: anywhere; }
         .wf-description { margin: 8px 0 0; font-size: 11px; line-height: 1.6; color: var(--wf-muted); overflow-wrap: anywhere; }
         .wf-transition { margin-top: 10px; padding-top: 10px; border-top: 1px solid #dce6f4; font-size: 11px; }
         .wf-transition strong { color: #334d70; }
@@ -73,11 +81,17 @@
                     <p class="wf-status" role="status">Loading workflow diagram…</p>
                 </div>
                 <footer class="wf-footer">
-                    <div class="wf-legend"><span><i class="wf-key wf-key-start"></i>Start</span><span><i class="wf-key"></i>State</span><span><i class="wf-key wf-key-end"></i>Terminal</span></div>
+                    <div class="wf-legend"><span><i class="wf-key wf-key-start"></i>Start</span><span><i class="wf-key"></i>State</span><span><i class="wf-key wf-key-end"></i>Terminal</span><span title="Queued for a worker"><i class="wf-key-async" aria-hidden="true"></i><span aria-hidden="true">◷</span> Async transition</span></div>
                     <span {{ stimulus_target(controller, 'status') }} role="status" aria-live="polite">Select a state to trace its connections · Drag to pan · Option/Alt + scroll or pinch to zoom</span>
                 </footer>
             </section>
-            <aside class="wf-sidebar" aria-label="Workflow states">
+            <aside class="wf-sidebar" aria-label="Workflow explorer">
+                <div class="nav nav-tabs" role="tablist" aria-label="Workflow details">
+                    <button class="nav-link active" id="wf-places-tab" data-bs-toggle="tab" data-bs-target="#wf-places-panel" type="button" role="tab" aria-controls="wf-places-panel" aria-selected="true">Places ({{ definition.places|length }})</button>
+                    <button class="nav-link" id="wf-transitions-tab" data-bs-toggle="tab" data-bs-target="#wf-transitions-panel" type="button" role="tab" aria-controls="wf-transitions-panel" aria-selected="false">Transitions ({{ definition.transitions|length }})</button>
+                </div>
+                <div class="tab-content">
+                <div class="tab-pane active show" id="wf-places-panel" role="tabpanel" aria-labelledby="wf-places-tab" tabindex="0">
                 <div class="wf-sidebar-head"><h3>Explore states</h3><p class="wf-hint">Select a state to see its paths and the guard expressions that allow each transition.</p>
                     <input class="wf-search" type="search" placeholder="Find a state…" aria-label="Find a state" {{ stimulus_target(controller, 'search') }} {{ stimulus_action(controller, 'search', 'input') }}>
                 </div>
@@ -92,10 +106,13 @@
                                 {% if place in definition.initialPlaces %}<span class="wf-tag wf-tag-start">Start</span>{% elseif transitions is empty %}<span class="wf-tag">Terminal</span>{% endif %}
                             </button>
                             <span class="wf-code">{{ place }}</span>
+                            {% set next = survos_workflow_metadata(flowCode, 'next', place)|default([]) %}
+                            <code class="wf-next" title="On entry, try these transitions in order; run the first enabled one.">next: {{ next|json_encode }}</code>
                             <div class="wf-details" hidden>
                                 {% if description %}<p class="wf-description">{{ description }}</p>{% endif %}
                                 {% for t in transitions %}
                                     <div class="wf-transition"><strong>{{ survos_workflow_metadata(flowCode, 'label', t) ?: t.name|replace({'_': ' '})|title }}</strong> → {{ t.tos|join(', ')|replace({'_': ' '}) }}
+                                        {% if survos_workflow_metadata(flowCode, 'async', t) is same as(true) %}<span class="wf-tag" title="Queued for a worker">Async</span>{% endif %}
                                         {% set transitionDescription = survos_workflow_metadata(flowCode, 'description', t) %}
                                         {% if transitionDescription %}<small>{{ transitionDescription }}</small>{% endif %}
                                         {% set guard = survos_workflow_metadata(flowCode, 'guard', t) %}
@@ -107,6 +124,33 @@
                         </div>
                     {% endfor %}
                     <p class="wf-status" {{ stimulus_target(controller, 'empty') }} hidden>No matching states.</p>
+                </div>
+                </div>
+                <div class="tab-pane" id="wf-transitions-panel" role="tabpanel" aria-labelledby="wf-transitions-tab" tabindex="0">
+                    <div class="wf-sidebar-head"><h3>Explore transitions</h3><p class="wf-hint">Async transitions are queued for a worker. Each row shows a path, including repeated transition names.</p></div>
+                    <div class="wf-transition-list">
+                        <table class="table table-vcenter mb-0 wf-transition-table">
+                            <caption class="visually-hidden">Transition descriptions, execution mode, guards and paths</caption>
+                            <thead><tr><th scope="col">Transition</th><th scope="col">From → To</th></tr></thead>
+                            <tbody>
+                            {% for t in definition.transitions %}
+                                {% set async = survos_workflow_metadata(flowCode, 'async', t) is same as(true) %}
+                                {% set description = survos_workflow_metadata(flowCode, 'description', t) %}
+                                {% set guard = survos_workflow_metadata(flowCode, 'guard', t) %}
+                                <tr>
+                                    <td><strong>{{ survos_workflow_metadata(flowCode, 'label', t) ?: t.name|replace({'_': ' '})|title }}</strong>
+                                        <span class="wf-tag">{{ async ? 'Async' : 'Sync' }}</span>
+                                        <code class="wf-code">{{ t.name }}</code>
+                                        {% if description %}<p class="wf-description">{{ description }}</p>{% endif %}
+                                        {% if guard %}<div class="wf-guard"><span class="wf-eyebrow">Guard</span><code>{{ guard }}</code></div>{% endif %}
+                                    </td>
+                                    <td>{% for from in t.froms %}{{ survos_workflow_metadata(flowCode, 'label', from) ?: from|replace({'_': ' '})|title }}{% if not loop.last %}, {% endif %}{% endfor %}<br><span aria-label="to">→</span><br>{% for to in t.tos %}{{ survos_workflow_metadata(flowCode, 'label', to) ?: to|replace({'_': ' '})|title }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
+                                </tr>
+                            {% else %}<tr><td colspan="2">No transitions.</td></tr>{% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
                 </div>
             </aside>
         </div>

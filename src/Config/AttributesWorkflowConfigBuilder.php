@@ -137,9 +137,9 @@ final class AttributesWorkflowConfigBuilder
                     $placesAssoc[$value] = $pm ? ['metadata' => $pm] : [];
 
                     // Initial for state_machine
-                    if (method_exists($p, 'getIsInitial') && $p->getIsInitial() && $wfType === 'state_machine' && !$initial) {
+                    if (method_exists($p, 'getIsInitial') && $p->getIsInitial() && $wfType === 'state_machine' && null === $initial) {
                         $initial = $value;
-                    } elseif (property_exists($p, 'initial') && $p->initial && $wfType === 'state_machine' && !$initial) {
+                    } elseif (property_exists($p, 'initial') && $p->initial && $wfType === 'state_machine' && null === $initial) {
                         $initial = $value;
                     }
                 }
@@ -209,7 +209,7 @@ final class AttributesWorkflowConfigBuilder
                 ],
             ];
 
-            if ($initial) {
+            if (null !== $initial) {
                 $node['initial_marking'] = $wfType === 'state_machine' ? $initial : (array) $initial;
             }
 
