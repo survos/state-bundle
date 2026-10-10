@@ -14,6 +14,7 @@ use Symfony\Component\DependencyInjection\Attribute\AutowireLocator;
 use Symfony\Component\DependencyInjection\Attribute\TaggedLocator;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Process\Process;
 use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
 use Symfony\Component\Workflow\Dumper\GraphvizDumper;
@@ -552,9 +553,10 @@ ORDER BY n.nspname, c.relname;");
         // Load + flush on the EM that maps the class (DatasetInfo is on the 'dataset' EM, not default).
         $em = $this->managerRegistry->getManagerForClass($message->getClassName()) ?? $this->entityManager;
         if (!$object = $em->find($message->getClassName(), $message->getId())) {
-            $this->logger?->error("Missing $message->id in $message->className");
-            $debugMessage = sprintf("missing entity %s for %s", $message->getClassName(), $message->getId());
-            return ['message' => $debugMessage];
+            // Fail loudly: returning here acked the message as handled, so a transition for an
+            // unregistered (or wrong-database) subject vanished with no retry and no failed entry.
+            // Unrecoverable: retrying cannot make the row appear; it goes to the failure transport.
+            throw new UnrecoverableMessageHandlingException(sprintf('Missing %s %s for transition "%s"', $message->getClassName(), $message->getId(), $message->getTransitionName()));
         }
 
         $workflow = $this->getWorkflow($object, $message->getWorkflow());

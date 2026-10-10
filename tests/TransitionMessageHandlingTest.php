@@ -77,6 +77,8 @@ final class TransitionMessageHandlingTest extends TestCase
         $registry->method('getManagerForClass')->willReturn($manager);
         $helper = new WorkflowHelperService(new ServiceLocator([]), $manager, $registry, $this->createStub(PropertyAccessorInterface::class), []);
 
-        self::assertSame(['message' => 'missing entity stdClass for 42'], $helper->handleTransition(new TransitionMessage('42', \stdClass::class, 'publish', 'article')));
+        $this->expectException(\Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException::class);
+        $this->expectExceptionMessage('Missing stdClass 42 for transition "publish"');
+        $helper->handleTransition(new TransitionMessage('42', \stdClass::class, 'publish', 'article'));
     }
 }
