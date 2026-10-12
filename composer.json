@@ -16,7 +16,7 @@
     "type": "symfony-bundle",
     "require": {
         "php": "^8.5",
-        "doctrine/orm": "^2.12 || ^3.3",
+        "doctrine/orm": "^3.7",
         "symfony/console": "^7.4||^8.1",
         "symfony/http-kernel": "^7.4||^8.1",
         "symfony/messenger": "^7.4||^8.1",
