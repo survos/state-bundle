@@ -1,52 +1,47 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\StateBundle\Controller;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Survos\FieldBundle\Repository\QueryBuilderHelperInterface;
 use Survos\StateBundle\Service\WorkflowHelperService;
-use Survos\StateBundle\Service\WorkflowStatsService;
 use Survos\StateBundle\Traits\MarkingInterface;
 use Symfony\Bridge\Twig\Attribute\Template;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapQueryParameter;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\Serializer\SerializerInterface;
-use Symfony\Component\Workflow\WorkflowInterface;
 use Symfony\UX\Chartjs\Builder\ChartBuilderInterface;
 use Symfony\UX\Chartjs\Model\Chart;
-use Zenstruck\Collection\Doctrine\ORM\Bridge\ORMServiceEntityRepository;
 
 class WorkflowController extends AbstractController
 {
     public function __construct(
-        private EntityManagerInterface  $entityManager,
+        private EntityManagerInterface $entityManager,
         protected WorkflowHelperService $workflowHelperService,
-        private SerializerInterface     $serializer,
-        private ?ChartBuilderInterface  $chartBuilder = null,
-
-
-    ) // , private Registry $registry)
-    {
-//        foreach ($this->tagged->getIterator() as $workflow) {
-//            dd($workflow);
-//        }
-//        dd($this->tagged);
+        private SerializerInterface $serializer,
+        private ?ChartBuilderInterface $chartBuilder = null,
+    ) { // , private Registry $registry)
+        //        foreach ($this->tagged->getIterator() as $workflow) {
+        //            dd($workflow);
+        //        }
+        //        dd($this->tagged);
         // $helper = $this->container->get('survos_workflow_bundle.workflow_helper'); // hmm, doesn't seem right.
         $this->workflowHelperService = $workflowHelperService;
         // $this->workflowRegistry = $this->get('workflow.registry'); // $helper->getRegistry();
     }
 
-    #[Route("/", name: "survos_workflows")]
+    #[Route('/', name: 'survos_workflows')]
     public function workflows(Request $request): Response
     {
         $workflowsGroupedByCode = $this->workflowHelperService->getWorkflowsIndexedByName();
         $workflowsGroupedByClass = $this->workflowHelperService->getWorkflowsGroupedByClass();
-        return $this->render("@SurvosState/index.html.twig", [
+
+        return $this->render('@SurvosState/index.html.twig', [
             'configs' => $this->workflowHelperService->getWorkflowConfiguration(),
             'workflowsGroupedByClass' => $workflowsGroupedByClass,
             'workflowsByCode' => $workflowsGroupedByCode,
@@ -61,10 +56,9 @@ class WorkflowController extends AbstractController
 
         /** @var QueryBuilderHelperInterface $class */
         foreach ($this->workflowHelperService->getWorkflowsGroupedByClass() as $class => $workflows) {
-//            $primaryKeyName = $this->entityManager->getClassMetadata($class)
-//                ->getSingleIdentifierFieldName();
+            //            $primaryKeyName = $this->entityManager->getClassMetadata($class)
+            //                ->getSingleIdentifierFieldName();
             // get the pk
-
 
             $workflow = $this->workflowHelperService->getWorkflowsGroupedByClass()[$class][0] ?? null;
             $total = $this->workflowHelperService->getApproxCount($class);
@@ -77,9 +71,7 @@ class WorkflowController extends AbstractController
                     'marking' => $markingCounts,
                 ];
 
-
             //            $palette = ['#f87171', '#60a5fa', '#facc15'];
-
 
             $palette = [
                 '#4E79A7', // Muted Blue
@@ -91,7 +83,7 @@ class WorkflowController extends AbstractController
                 '#B07AA1', // Lavender
                 '#FF9DA7', // Pink
                 '#9C755F', // Brown
-                '#BAB0AC'  // Gray
+                '#BAB0AC',  // Gray
             ];
 
             $markings = array_keys($markingCounts);
@@ -107,16 +99,14 @@ class WorkflowController extends AbstractController
                     // palette? default from name, e.g. new, details, or the order
                     $color = match ($marking) {
                         'new' => 'lightYellow',
-                        default => null
+                        default => null,
                     };
                     if (!$color) {
                         $color = $palette[$idx];
-
                     }
                 }
                 $colors[] = $color;
                 //                dd($workflow, $workflowName, $color, $marking, $workflowName);
-
             }
 
             $chart = null;
@@ -139,13 +129,13 @@ class WorkflowController extends AbstractController
                         ],
                     ],
                 ]);
-                if ($total)
+                if ($total) {
                     $charts[$class] = [
                         'chart' => $chart,
                         'total' => $total,
                     ];
+                }
             }
-
         }
 
         return [
@@ -156,29 +146,27 @@ class WorkflowController extends AbstractController
         ];
     }
 
-
     #[Route(path: '/workflow/transition/{workflowCode}/{entityIdentifier}/{transition}.{_format}', name: 'survos_workflow_transition', options: ['expose' => true])]
-    public function _transition(Request                      $request,
-                                WorkflowHelperService        $workflowHelperService,
-                                EntityManagerInterface       $entityManager,
-                                string|int                   $entityIdentifier, // for now, must be unique, we could somehow use rp though
-                                string                       $workflowCode,
-                                ?string                      $transition = null, // for the POST requests
-                                #[MapQueryParameter] ?string $className = null,
-                                #[MapQueryParameter] ?string $redirectRoute = null,
-                                #[MapQueryParameter] array   $redirectParams = [],
-                                string                       $_format = 'html',
-    ): Response
-    {
+    public function _transition(Request $request,
+        WorkflowHelperService $workflowHelperService,
+        EntityManagerInterface $entityManager,
+        string|int $entityIdentifier, // for now, must be unique, we could somehow use rp though
+        string $workflowCode,
+        ?string $transition = null, // for the POST requests
+        #[MapQueryParameter] ?string $className = null,
+        #[MapQueryParameter] ?string $redirectRoute = null,
+        #[MapQueryParameter] array $redirectParams = [],
+        string $_format = 'html',
+    ): Response {
         /** @var MarkingInterface $entity */
         $entity = $this->entityManager->getRepository($className)->find($entityIdentifier);
         assert($entity, "$entityIdentifier not found in $className");
 
         $stateMachine = $workflowHelperService->getWorkflowByCode($workflowCode);
-//        dd($stateMachine, $entity);
+        //        dd($stateMachine, $entity);
 
         //        $repo = $this->entityManager->getRepository($entity::class);
-        if ($transition === '_hard_reset') {
+        if ('_hard_reset' === $transition) {
             $entity->setMarking($stateMachine->getDefinition()->getInitialPlaces()[0]);
         } else {
             if ($stateMachine->can($entity, $transition)) {
@@ -190,24 +178,25 @@ class WorkflowController extends AbstractController
             }
         }
         $entityManager->flush();
+
         return $this->redirectToRoute($redirectRoute, $redirectParams);
+
         return $this->jsonResponse($entity, $request, $_format);
     }
 
-    #[Route("/workflow/{flowCode}", name: "survos_workflow")]
+    #[Route('/workflow/{flowCode}', name: 'survos_workflow')]
     public function workflow(Request $request,
-                                     $flowCode, $entityClass = null): Response
+        $flowCode, $entityClass = null): Response
     {
         // @todo: handle empty flowcode, needs to look up by class
 
         $workflow = $this->workflowHelperService->getWorkflowByCode($flowCode);
         $json = $this->serializer->serialize($workflow->getDefinition(), 'json');
-//        dd($json, $workflow, json_encode($workflow->getDefinition()));
+        //        dd($json, $workflow, json_encode($workflow->getDefinition()));
         $classes = $this->workflowHelperService->getSupports($flowCode);
 
-//        dd($workflow, $classes);
-        $entity = $entityClass ? (new $entityClass) : null;
-
+        //        dd($workflow, $classes);
+        $entity = $entityClass ? (new $entityClass()) : null;
 
         $params = [
             'flowName' => $flowCode,
@@ -246,11 +235,10 @@ class WorkflowController extends AbstractController
 
         // group by class
         return $this->render('@SurvosState/d3-workflow.html.twig', $params + [
-                'digraph' => $dumper,
-                // survos/command-bundle is optional; without it transitions render unlinked.
-                'commandRouteExists' => null !== $this->container->get('router')->getRouteCollection()->get('survos_command'),
-                // 'workflows' => $workflows['workflow']['workflows'],
-            ]);
+            'digraph' => $dumper,
+            // survos/command-bundle is optional; without it transitions render unlinked.
+            'commandRouteExists' => null !== $this->container->get('router')->getRouteCollection()->get('survos_command'),
+            // 'workflows' => $workflows['workflow']['workflows'],
+        ]);
     }
-
 }

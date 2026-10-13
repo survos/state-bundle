@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\StateBundle\Controller;
 
 use Survos\StateBundle\Traits\MarkingInterface;
@@ -9,9 +11,9 @@ use Symfony\Component\Workflow\WorkflowInterface;
 interface HandleTransitionsInterface
 {
     public function handleTransitionButtons(
-        ?WorkflowInterface $workflow=null,
-        ?string $transition=null,
-        ?MarkingInterface $entity=null,
+        ?WorkflowInterface $workflow = null,
+        ?string $transition = null,
+        ?MarkingInterface $entity = null,
         ?MessageBusInterface $bus = null,
     ): ?string;
 

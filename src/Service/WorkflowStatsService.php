@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Service;
@@ -14,7 +15,8 @@ final class WorkflowStatsService
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly EntityInterfaceDetector $entityInterfaceDetector,
-    ) {}
+    ) {
+    }
 
     /**
      * @return array{
@@ -40,8 +42,8 @@ final class WorkflowStatsService
             $byMarking = [];
             $total = 0;
             foreach ($rows as $r) {
-                $m = (string)($r['marking'] ?? '');
-                $c = (int)$r['c'];
+                $m = (string) ($r['marking'] ?? '');
+                $c = (int) $r['c'];
                 $byMarking[$m] = $c;
                 $total += $c;
             }

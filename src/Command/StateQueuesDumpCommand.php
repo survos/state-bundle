@@ -1,15 +1,14 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Command;
 
 use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Attribute\Option;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Helper\Table;
+use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use Symfony\Contracts\Service\ServiceProviderInterface;
@@ -57,12 +56,14 @@ final class StateQueuesDumpCommand
 
         if (!$this->receiverLocator) {
             $io->writeln('  (receiver locator not available)');
+
             return Command::SUCCESS;
         }
 
         $services = $this->receiverLocator->getProvidedServices(); // id => class-string|?null
         if (!$services) {
             $io->writeln('  (no transports discovered)');
+
             return Command::SUCCESS;
         }
 

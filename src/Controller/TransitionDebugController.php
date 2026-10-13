@@ -10,14 +10,14 @@ use Survos\StateBundle\Service\AsyncQueueLocator;
 use Survos\StateBundle\Service\WorkflowHelperService;
 use Survos\StateBundle\Traits\MarkingInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapQueryParameter;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Workflow\WorkflowInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Security\Http\Attribute\IsCsrfTokenValid;
+use Symfony\Component\Workflow\WorkflowInterface;
 
 class TransitionDebugController extends AbstractController
 {
@@ -36,7 +36,8 @@ class TransitionDebugController extends AbstractController
         private readonly AsyncQueueLocator $asyncQueueLocator,
         private readonly MessageBusInterface $bus,
         #[Autowire('%survos_state.allow_force_place%')] private readonly bool $allowForcePlace = false,
-    ) {}
+    ) {
+    }
 
     // entityId is greedy and LAST on both routes. An entity's primary key is allowed to
     // contain a slash -- dataset-bundle's DatasetInfo is keyed by "nara/rg_105" -- and
@@ -50,7 +51,7 @@ class TransitionDebugController extends AbstractController
         int|string $entityId,
         #[MapQueryParameter] ?string $redirectUrl = null,
     ): Response {
-        $entity   = $this->loadEntity($globalKey, $entityId);
+        $entity = $this->loadEntity($globalKey, $entityId);
         $workflow = $this->workflowHelperService->getWorkflowByCode($workflowCode);
 
         $enabledNames = [];
@@ -65,12 +66,12 @@ class TransitionDebugController extends AbstractController
             $name = $t->getName();
             if (!isset($transitions[$name])) {
                 $transitions[$name] = [
-                    'name'    => $name,
-                    'froms'   => [],
-                    'tos'     => [],
-                    'meta'    => $metadataStore->getTransitionMetadata($t),
+                    'name' => $name,
+                    'froms' => [],
+                    'tos' => [],
+                    'meta' => $metadataStore->getTransitionMetadata($t),
                     'enabled' => isset($enabledNames[$name]),
-                    'async'   => $this->asyncQueueLocator->isAsync($workflow->getName(), $name),
+                    'async' => $this->asyncQueueLocator->isAsync($workflow->getName(), $name),
                 ];
             }
             foreach ($t->getFroms() as $from) {
@@ -84,13 +85,13 @@ class TransitionDebugController extends AbstractController
         $marking = $entity->getMarking();
 
         return $this->render('@SurvosState/debug/transitions.html.twig', [
-            'entity'      => $entity,
-            'class'       => $entity::class,
-            'globalKey'   => $globalKey,
+            'entity' => $entity,
+            'class' => $entity::class,
+            'globalKey' => $globalKey,
             'workflowCode' => $workflowCode,
-            'entityId'    => $entityId,
-            'marking'     => $marking,
-            'placeMeta'   => $metadataStore->getPlaceMetadata($marking),
+            'entityId' => $entityId,
+            'marking' => $marking,
+            'placeMeta' => $metadataStore->getPlaceMetadata($marking),
             'transitions' => array_values($transitions),
             'redirectUrl' => $redirectUrl,
         ]);
@@ -121,11 +122,11 @@ class TransitionDebugController extends AbstractController
         string $transition,
         #[MapQueryParameter] ?string $redirectUrl = null,
     ): Response {
-        $entity   = $this->loadEntity($globalKey, $entityId);
+        $entity = $this->loadEntity($globalKey, $entityId);
         $workflow = $this->workflowHelperService->getWorkflowByCode($workflowCode);
-        $mode     = (string) $request->request->get('mode', '');
+        $mode = (string) $request->request->get('mode', '');
 
-        if ($transition === self::HARD_RESET || $mode === 'reset') {
+        if (self::HARD_RESET === $transition || 'reset' === $mode) {
             return $this->forcePlace(
                 $entity,
                 $workflow->getDefinition()->getInitialPlaces()[0],
@@ -137,7 +138,7 @@ class TransitionDebugController extends AbstractController
             );
         }
 
-        if ($transition === self::FORCE_PLACE) {
+        if (self::FORCE_PLACE === $transition) {
             return $this->forcePlace(
                 $entity,
                 (string) $request->request->get('place', ''),
@@ -157,8 +158,8 @@ class TransitionDebugController extends AbstractController
             return $this->back($globalKey, $workflowCode, $entityId, $redirectUrl);
         }
 
-        $forceSync = $mode === 'sync';
-        $isAsync   = !$forceSync && $this->asyncQueueLocator->isAsync($workflow->getName(), $transition);
+        $forceSync = 'sync' === $mode;
+        $isAsync = !$forceSync && $this->asyncQueueLocator->isAsync($workflow->getName(), $transition);
 
         // Everything goes through the bus, including the synchronous case -- the message
         // handler is where can()/apply()/flush() actually live, so routing a debug run to
@@ -243,7 +244,7 @@ class TransitionDebugController extends AbstractController
         $class = $this->workflowHelperService->classFromGlobalKey($globalKey);
 
         $em = $this->managerRegistry->getManagerForClass($class);
-        if ($em === null) {
+        if (null === $em) {
             throw $this->createNotFoundException("$class is not managed by any entity manager.");
         }
 
@@ -263,9 +264,9 @@ class TransitionDebugController extends AbstractController
         }
 
         return $this->redirectToRoute('survos_state_debug_transitions', [
-            'globalKey'    => $globalKey,
+            'globalKey' => $globalKey,
             'workflowCode' => $workflowCode,
-            'entityId'     => $entityId,
+            'entityId' => $entityId,
         ]);
     }
 }

@@ -1,13 +1,15 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Compiler;
 
 use Doctrine\ORM\Mapping as ORM;
+use Survos\StateBundle\Traits\MarkingInterface;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Finder\Finder;
-use Survos\StateBundle\Traits\MarkingInterface;
+
 /**
  * Scans Doctrine mapping directories and registers all entities that implement MarkingInterface.
  * Works at compile-time; no runtime queries, no tagging required.
@@ -17,7 +19,8 @@ final class RegisterWorkflowEntitiesPass implements CompilerPassInterface
     public function process(ContainerBuilder $container): void
     {
         if (!$container->hasParameter('doctrine.orm.mappings')) {
-            assert(false, "not seeing doctrine.orm.mappings");
+            assert(false, 'not seeing doctrine.orm.mappings');
+
             // DoctrineBundle not enabled? Nothing to do.
             return;
         }
@@ -42,8 +45,8 @@ final class RegisterWorkflowEntitiesPass implements CompilerPassInterface
                 continue;
             }
 
-            $type   = $cfg['type']   ?? 'attribute';
-            $prefix = rtrim((string)($cfg['prefix'] ?? ''), '\\');
+            $type = $cfg['type'] ?? 'attribute';
+            $prefix = rtrim((string) ($cfg['prefix'] ?? ''), '\\');
 
             $finder = (new Finder())
                 ->files()
@@ -90,19 +93,20 @@ final class RegisterWorkflowEntitiesPass implements CompilerPassInterface
      */
     private function guessClassFromFile(string $file, string $prefix, string $rootDir): ?string
     {
-        if ($prefix !== '') {
+        if ('' !== $prefix) {
             // Compute subpath relative to mapping root, turn path into class fragments.
             $rel = ltrim(str_replace('\\', '/', substr($file, strlen(rtrim($rootDir, DIRECTORY_SEPARATOR)) + 1)), '/');
             $base = preg_replace('/\.php$/', '', $rel);
             if ($base) {
-                $fq = $prefix . '\\' . str_replace('/', '\\', $base);
+                $fq = $prefix.'\\'.str_replace('/', '\\', $base);
+
                 return $fq;
             }
         }
 
         // Fallback: parse file for namespace + class (naive but sufficient).
         $src = @file_get_contents($file);
-        if ($src === false) {
+        if (false === $src) {
             return null;
         }
         $ns = null;
@@ -111,8 +115,10 @@ final class RegisterWorkflowEntitiesPass implements CompilerPassInterface
         }
         if (preg_match('/^class\s+([A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*)/m', $src, $m)) {
             $cls = $m[1];
-            return $ns ? ($ns . '\\' . $cls) : $cls;
+
+            return $ns ? ($ns.'\\'.$cls) : $cls;
         }
+
         return null;
     }
 
@@ -139,7 +145,7 @@ final class RegisterWorkflowEntitiesPass implements CompilerPassInterface
         // Look for ORM\Entity attribute
         foreach ($ref->getAttributes() as $attr) {
             $name = $attr->getName();
-            if ($name === ORM\Entity::class || $name === \Doctrine\ORM\Mapping\Entity::class) {
+            if (ORM\Entity::class === $name || ORM\Entity::class === $name) {
                 return true;
             }
         }

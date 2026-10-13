@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\StateBundle\Service;
 
 use Symfony\Component\Workflow\Definition;
@@ -12,23 +14,23 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
     private array $dumpOptions = [];
 
     protected static array $defaultOptions = [
-        'graph'      => ['ratio' => 'compress', 'rankdir' => 'LR'],
-        'node'       => [
-            'fontsize'  => '10',
-            'fontname'  => 'Helvetica',
-            'color'     => '#333333',
-            'style'     => 'rounded,filled',
+        'graph' => ['ratio' => 'compress', 'rankdir' => 'LR'],
+        'node' => [
+            'fontsize' => '10',
+            'fontname' => 'Helvetica',
+            'color' => '#333333',
+            'style' => 'rounded,filled',
             'fixedsize' => 'false',
-            'width'     => '1',
+            'width' => '1',
         ],
-        'edge'       => [
-            'fontsize'  => '8',
-            'fontname'  => 'Helvetica',
-            'color'     => '#333333',
+        'edge' => [
+            'fontsize' => '8',
+            'fontname' => 'Helvetica',
+            'color' => '#333333',
             'arrowhead' => 'normal',
             'arrowsize' => '0.5',
         ],
-        'place'      => ['shape' => 'oval', 'fillcolor' => 'white',       'fontcolor' => '#000000'],
+        'place' => ['shape' => 'oval', 'fillcolor' => 'white',       'fontcolor' => '#000000'],
         'transition' => ['shape' => 'box',   'fillcolor' => 'lightyellow', 'fontcolor' => '#000000'],
     ];
 
@@ -37,45 +39,45 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
         // Merge provided options with defaults
         $options = array_replace_recursive(self::$defaultOptions, $options);
         $this->dumpOptions = $options;
-        $withMetadata     = $options['with-metadata'] ?? true;
+        $withMetadata = $options['with-metadata'] ?? true;
 
-        $places      = $this->findPlaces($definition, $withMetadata, $marking);
+        $places = $this->findPlaces($definition, $withMetadata, $marking);
         $transitions = $this->findTransitions($definition, $withMetadata);
-        $edges       = $this->findEdges($definition);
-        $label       = $this->formatLabel($definition, $withMetadata, $options);
+        $edges = $this->findEdges($definition);
+        $label = $this->formatLabel($definition, $withMetadata, $options);
 
         // Guard against missing keys
-        $placeStyle      = array_merge($options['node'] ?? [], $options['place'] ?? []);
+        $placeStyle = array_merge($options['node'] ?? [], $options['place'] ?? []);
         $transitionStyle = array_merge($options['node'] ?? [], $options['transition'] ?? []);
 
-        $dot  = $this->startDot($options, $label)
+        $dot = $this->startDot($options, $label)
             // Places cluster
-            . "  subgraph cluster_places {\n"
-            . "    node [" . $this->addOptions($placeStyle) . "];\n"
-            . $this->addPlaces($places, $withMetadata)
-            . "  }\n"
+            ."  subgraph cluster_places {\n"
+            .'    node ['.$this->addOptions($placeStyle)."];\n"
+            .$this->addPlaces($places, $withMetadata)
+            ."  }\n"
             // Transitions cluster
-            . "  subgraph cluster_transitions {\n"
-            . "    node [" . $this->addOptions($transitionStyle) . "];\n"
-            . $this->addTransitions($transitions, $withMetadata)
-            . "  }\n"
+            ."  subgraph cluster_transitions {\n"
+            .'    node ['.$this->addOptions($transitionStyle)."];\n"
+            .$this->addTransitions($transitions, $withMetadata)
+            ."  }\n"
             // Edges and close
-            . $this->addEdges($edges)
-            . $this->endDot();
+            .$this->addEdges($edges)
+            .$this->endDot();
 
         return $dot;
     }
 
     protected function findPlaces(Definition $definition, bool $withMetadata, ?Marking $marking = null): array
     {
-        $opts   = $this->dumpOptions;
-        $store  = $definition->getMetadataStore();
+        $opts = $this->dumpOptions;
+        $store = $definition->getMetadataStore();
         $places = [];
 
         foreach ($definition->getPlaces() as $place) {
             $attrs = [
-                'shape'     => $opts['place']['shape'],
-                'style'     => 'filled',
+                'shape' => $opts['place']['shape'],
+                'style' => 'filled',
                 'fillcolor' => $store->getMetadata('bg_color', $place) ?? $opts['place']['fillcolor'],
                 'fontcolor' => $opts['place']['fontcolor'],
             ];
@@ -83,7 +85,7 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
                 $attrs['penwidth'] = '2';
             }
             if ($marking?->has($place)) {
-                $attrs['color']    = '#d9534f';
+                $attrs['color'] = '#d9534f';
                 $attrs['penwidth'] = '2';
             }
 
@@ -115,18 +117,18 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
 
     protected function findTransitions(Definition $definition, bool $withMetadata, array $listeners = []): array
     {
-        $opts        = $this->dumpOptions;
-        $store       = $definition->getMetadataStore();
+        $opts = $this->dumpOptions;
+        $store = $definition->getMetadataStore();
         $transitions = [];
 
         foreach ($definition->getTransitions() as $i => $transition) {
             $attrs = [
-                'shape'     => $opts['transition']['shape'],
-                'style'     => 'filled',
+                'shape' => $opts['transition']['shape'],
+                'style' => 'filled',
                 'fillcolor' => $store->getMetadata('bg_color', $transition) ?? $opts['transition']['fillcolor'],
                 'fontcolor' => $opts['transition']['fontcolor'],
             ];
-            $name     = $store->getMetadata('label', $transition) ?? $transition->getName();
+            $name = $store->getMetadata('label', $transition) ?? $transition->getName();
             $metadata = $withMetadata ? $store->getTransitionMetadata($transition) : [];
             unset($metadata['label']);
 
@@ -167,7 +169,7 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
     {
         $code = '';
         foreach ($transitions as $i => $tran) {
-            $dotId = $this->dotize((string)$i);
+            $dotId = $this->dotize((string) $i);
             if ($withMetadata && !empty($tran['metadata'])) {
                 $label = sprintf(
                     '<<B>%s</B>%s>',
@@ -194,8 +196,8 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
         $code = '';
         foreach ($edges as $edge) {
             $from = $this->dotize($edge['from']);
-            $to   = $this->dotize($edge['to']);
-            $num  = $edge['transition']??null;
+            $to = $this->dotize($edge['to']);
+            $num = $edge['transition'] ?? null;
 
             $code .= sprintf("  place_%s -> transition_%s [style=\"solid\"];\n", $from, $num);
             $code .= sprintf("  transition_%s -> place_%s [style=\"solid\"];\n", $num, $to);
@@ -212,7 +214,7 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
             $lines .= sprintf("  %s=\"%s\";\n", $k, $v);
         }
 
-        $labelLine = $label && $label !== '<>'
+        $labelLine = $label && '<>' !== $label
             ? sprintf("  label=%s;\n", $label)
             : '';
 
@@ -220,10 +222,10 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
         $edgeOpts = $this->addOptions($options['edge']);
 
         return "digraph workflow {\n"
-            . $lines
-            . $labelLine
-            . "  node [{$nodeOpts}];\n"
-            . "  edge [{$edgeOpts}];\n\n";
+            .$lines
+            .$labelLine
+            ."  node [{$nodeOpts}];\n"
+            ."  edge [{$edgeOpts}];\n\n";
     }
 
     protected function endDot(): string
@@ -234,18 +236,18 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
     protected function formatLabel(Definition $definition, bool $withMetadata, array $options): string
     {
         $current = $options['label'] ?? '';
-        $meta    = $definition->getMetadataStore()->getWorkflowMetadata();
+        $meta = $definition->getMetadataStore()->getWorkflowMetadata();
 
         if ('false' === $withMetadata) {
             return sprintf('"%s"', $this->escape($current));
         }
 
         if ('' === $current) {
-            return sprintf("<%s>", $this->addMetadata($meta, false));
+            return sprintf('<%s>', $this->addMetadata($meta, false));
         }
 
         return sprintf(
-            "<<B>%s</B>%s>",
+            '<<B>%s</B>%s>',
             $this->escape($current),
             $this->addMetadata($meta)
         );
@@ -257,15 +259,17 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
             return '';
         }
         $escaped = htmlspecialchars($value, ENT_QUOTES);
-        return addslashes(wordwrap($escaped, 20, "<BR/>", true));
+
+        return addslashes(wordwrap($escaped, 20, '<BR/>', true));
     }
 
     protected function addAttributes(array $attrs): string
     {
         $parts = [];
         foreach ($attrs as $k => $v) {
-            $parts[] = sprintf('%s="%s"', $k, $this->escape((string)$v));
+            $parts[] = sprintf('%s="%s"', $k, $this->escape((string) $v));
         }
+
         return $parts ? ' '.implode(' ', $parts) : '';
     }
 
@@ -275,12 +279,13 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
         foreach ($opts as $k => $v) {
             $parts[] = sprintf('%s="%s"', $k, $v);
         }
+
         return implode(' ', $parts);
     }
 
     protected function addMetadata(array $metadata, bool $lineBreak = true): string
     {
-        $out   = [];
+        $out = [];
         $first = !$lineBreak;
         foreach ($metadata as $k => $v) {
             if ('bg_color' === $k) {
@@ -292,16 +297,17 @@ class SurvosGraphVizDumper2 extends GraphvizDumper
             }
             switch ($k) {
                 case 'description':
-                    $out[] = sprintf('%s<I>%s</I>', $prefix, $this->escape((string)$v));
+                    $out[] = sprintf('%s<I>%s</I>', $prefix, $this->escape((string) $v));
                     break;
                 case 'guard':
-                    $out[] = sprintf('%s<U>%s</U>', $prefix, $this->escape((string)$v));
+                    $out[] = sprintf('%s<U>%s</U>', $prefix, $this->escape((string) $v));
                     break;
                 default:
-                    $out[] = sprintf('%s%s: %s', $prefix, $this->escape($k), $this->escape((string)$v));
+                    $out[] = sprintf('%s%s: %s', $prefix, $this->escape($k), $this->escape((string) $v));
             }
             $first = false;
         }
+
         return implode('', $out);
     }
 

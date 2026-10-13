@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle;
@@ -11,13 +12,14 @@ use Survos\StateBundle\Command\DumpWorkflowPhpCommand;
 use Survos\StateBundle\Command\DumpWorkflowsYamlCommand;
 use Survos\StateBundle\Command\IterateCommand;
 use Survos\StateBundle\Command\MakeWorkflowCommand;
-use Survos\StateBundle\Command\StateQueuesDumpCommand;
 use Survos\StateBundle\Command\StateQueuesContextsCommand;
+use Survos\StateBundle\Command\StateQueuesDumpCommand;
 use Survos\StateBundle\Compiler\RegisterWorkflowEntitiesPass;
 use Survos\StateBundle\Compiler\StatePrependExtension;
 use Survos\StateBundle\Controller\TransitionDebugController;
 use Survos\StateBundle\Controller\WorkflowController;
 use Survos\StateBundle\Controller\WorkflowDashboardController;
+use Survos\StateBundle\Doctrine\InitialPlaceKickoffListener;
 use Survos\StateBundle\Doctrine\PostLoadSetEnabledTransitionsListener;
 use Survos\StateBundle\Doctrine\TransitionListener;
 use Survos\StateBundle\Messenger\Middleware\AsyncQueueRoutingMiddleware;
@@ -30,24 +32,21 @@ use Survos\StateBundle\Service\ConsoleEventListener;
 use Survos\StateBundle\Service\EntityInterfaceDetector;
 use Survos\StateBundle\Service\PrimaryKeyLocator;
 use Survos\StateBundle\Service\WorkflowHelperService;
-use Survos\StateBundle\Doctrine\InitialPlaceKickoffListener;
 use Survos\StateBundle\Service\WorkflowListener;
 use Survos\StateBundle\Service\WorkflowStatsService;
-use Survos\StateBundle\Traits\EasyMarkingTrait;
-use Survos\StateBundle\Traits\MarkingInterface;
 use Survos\StateBundle\Twig\Components\WorkflowMarkingComponent;
 use Survos\StateBundle\Twig\WorkflowExtension;
-use Symfony\Component\Workflow\Command\WorkflowDumpCommand;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\Config\Definition\Processor;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Kernel\RequiredBundle;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Workflow\Command\WorkflowDumpCommand;
+
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_locator;
 
 #[RequiredBundle(SurvosKitBundle::class)]
@@ -67,13 +66,12 @@ final class SurvosStateBundle extends AbstractUxBundle
         parent::build($container);
         $this->addRouteLoaderCompilerPass($container);
         // BatchTransitionMiddleware onto the buses; before MessengerPass (priority 0) builds them.
-        $container->addCompilerPass(new \Survos\StateBundle\Compiler\BatchTransitionMiddlewarePass(), \Symfony\Component\DependencyInjection\Compiler\PassConfig::TYPE_BEFORE_OPTIMIZATION, 10);
-//        $container->addCompilerPass(new RegisterWorkflowEntitiesPass());
+        $container->addCompilerPass(new Compiler\BatchTransitionMiddlewarePass(), \Symfony\Component\DependencyInjection\Compiler\PassConfig::TYPE_BEFORE_OPTIMIZATION, 10);
+        //        $container->addCompilerPass(new RegisterWorkflowEntitiesPass());
     }
 
     public function process(ContainerBuilder $container): void
     {
-
         // Pull the fully-processed Framework configuration
         $frameworkExt = $container->getExtension('framework');
         $rawFramework = $container->getExtensionConfig('framework');
@@ -85,7 +83,7 @@ final class SurvosStateBundle extends AbstractUxBundle
         // `workflow` extension's configuration, so the framework config above no longer carries them (and
         // every consumer of workflows.configuration saw none). 8.1 still has them under framework, so this
         // only kicks in when that came back empty.
-        if ($workflowConfig === [] && $container->hasExtension('workflow')) {
+        if ([] === $workflowConfig && $container->hasExtension('workflow')) {
             $workflowExt = $container->getExtension('workflow');
             $rawWorkflow = $container->getExtensionConfig('workflow');
             if (($workflowConfiguration = $workflowExt->getConfiguration($rawWorkflow, $container)) !== null) {
@@ -93,7 +91,6 @@ final class SurvosStateBundle extends AbstractUxBundle
             }
         }
         $container->setParameter('workflows.configuration', $workflowConfig);
-
 
         $container->findDefinition(WorkflowHelperService::class)
             ->setArgument('$managerRegistry', new Reference('doctrine'))
@@ -121,7 +118,7 @@ final class SurvosStateBundle extends AbstractUxBundle
 
         // 1) Register middleware + core services
         $builder->autowire(AsyncQueueRoutingMiddleware::class)->setAutoconfigured(true)->setPublic(false);
-        $builder->autowire(\Survos\StateBundle\Messenger\Middleware\BatchTransitionMiddleware::class)->setPublic(false)
+        $builder->autowire(Messenger\Middleware\BatchTransitionMiddleware::class)->setPublic(false)
             ->setArgument('$batchEnabled', $config['batch_enabled'] ?? true);
         $builder->autowire(PrimaryKeyLocator::class)->setAutoconfigured(true)->setPublic(false);
 
@@ -159,32 +156,30 @@ final class SurvosStateBundle extends AbstractUxBundle
         // gate it on enable_dynamic_routing by registering the definition only when that is true
         // (the pass then early-returns on !hasDefinition, exactly as the batch pass does).
 
-
-
         // Batched transitions (#[Transition(batch: N)]) — the one handler for BatchedTransitionMessage.
-        $builder->autowire(\Survos\StateBundle\Messenger\BatchTransitionHandler::class)
+        $builder->autowire(Messenger\BatchTransitionHandler::class)
             ->setAutoconfigured(true)
             ->setArgument('$defaultBatchSize', $config['batch_size'] ?? 100)
             ->setArgument('$idleTimeout', $config['batch_idle_timeout'] ?? 5);
 
         foreach ([AsyncQueueLocator::class,
-                     WorkflowStatsService::class,
-                     EntityInterfaceDetector::class,
-                     WorkflowHelperService::class] as $class) {
+            WorkflowStatsService::class,
+            EntityInterfaceDetector::class,
+            WorkflowHelperService::class] as $class) {
             $builder->autowire($class)
                 ->setPublic(true)
                 ->setAutowired(true)
                 ->setAutoconfigured(true);
         }
 
-            $builder->autowire(WorkflowController::class)
-                ->setPublic(true)
-                ->setArgument('$workflowHelperService', new Reference(WorkflowHelperService::class))
-                ->setArgument('$serializer', new Reference('serializer'))
+        $builder->autowire(WorkflowController::class)
+            ->setPublic(true)
+            ->setArgument('$workflowHelperService', new Reference(WorkflowHelperService::class))
+            ->setArgument('$serializer', new Reference('serializer'))
 //                ->setAutoconfigured(true)
-                ->setAutowired(true)
-                ->addTag('container.service_subscriber')
-                ->addTag('controller.service_arguments');
+            ->setAutowired(true)
+            ->addTag('container.service_subscriber')
+            ->addTag('controller.service_arguments');
 
         $builder->autowire(WorkflowDashboardController::class)
             ->setPublic(true)
@@ -204,16 +199,15 @@ final class SurvosStateBundle extends AbstractUxBundle
         $builder->autowire(IterateCommand::class)->setAutoconfigured(true);
 
         foreach ([
-                     DumpWorkflowPhpCommand::class,
-                     DumpWorkflowsYamlCommand::class,
-                     MakeWorkflowCommand::class,
-                     StateQueuesDumpCommand::class,
-                 ] as $commandClass) {
+            DumpWorkflowPhpCommand::class,
+            DumpWorkflowsYamlCommand::class,
+            MakeWorkflowCommand::class,
+            StateQueuesDumpCommand::class,
+        ] as $commandClass) {
             if (class_exists($commandClass)) {
                 $builder->autowire($commandClass)->setAutoconfigured(true)->addTag('console.command');
             }
         }
-
 
         $services = $container->services();
         // NOT best practice for bundles.
@@ -222,7 +216,6 @@ final class SurvosStateBundle extends AbstractUxBundle
             ->autowire()
             ->autoconfigure();
 
-
         // middleware
         // Put on every bus by BatchTransitionMiddlewarePass; no tag (8.2 requires `bus` on it).
         $services->set(ContextStampingMiddleware::class);
@@ -230,8 +223,8 @@ final class SurvosStateBundle extends AbstractUxBundle
         // explicit failure listener (you already had this)
         $services->set(LogMessageFailureListener::class)
             ->tag('kernel.event_listener', [
-                'event'    => WorkerMessageFailedEvent::class,
-                'method'   => '__invoke',
+                'event' => WorkerMessageFailedEvent::class,
+                'method' => '__invoke',
                 'priority' => 0,
             ]);
 
@@ -240,11 +233,10 @@ final class SurvosStateBundle extends AbstractUxBundle
 //            ->arg('$filterEnvName', '%env(default:CONTEXT_STAMP:STATE_FILTER_ENV)%');
             ->arg('$filterEnvName', 'CONTEXT_STAMP') // default; STATE_FILTER_ENV can override at runtime
             ->tag('kernel.event_listener', [
-                'event'    => WorkerMessageReceivedEvent::class,
-                'method'   => '__invoke',
+                'event' => WorkerMessageReceivedEvent::class,
+                'method' => '__invoke',
                 'priority' => 1000,
             ]);
-
 
         $builder->setParameter('survos_workflow.base_layout', $config['base_layout'] ?? 'base.html.twig');
 
@@ -261,9 +253,8 @@ final class SurvosStateBundle extends AbstractUxBundle
             ->addTag('console.command')
             ->setAutoconfigured(true);
 
-
         $builder->autowire(WorkflowExtension::class)
-            ->addArgument(new \Symfony\Component\DependencyInjection\Reference(WorkflowHelperService::class))
+            ->addArgument(new Reference(WorkflowHelperService::class))
             ->addTag('twig.extension');
 
         $builder->autowire(WorkflowMarkingComponent::class)
@@ -273,14 +264,14 @@ final class SurvosStateBundle extends AbstractUxBundle
         // other Survos bundle). Only when tabler-bundle is present; autoconfigure picks
         // up the #[AsEventListener] on the subscriber.
         if (class_exists(\Survos\TablerBundle\Event\MenuEvent::class)) {
-            $builder->autowire(\Survos\StateBundle\Menu\StateMenuSubscriber::class)
+            $builder->autowire(Menu\StateMenuSubscriber::class)
                 ->setAutowired(true)
                 ->setAutoconfigured(true);
         }
 
-//        $builder->autowire(ConfigureFromAttributesService::class)->setAutoconfigured(true)->setPublic(true);
-//        $builder->autowire(TransitionListener::class)->setAutoconfigured(true)->setPublic(true);
-//        $builder->autowire(PostLoadSetEnabledTransitionsListener::class)->setAutoconfigured(true)->setPublic(true);
+        //        $builder->autowire(ConfigureFromAttributesService::class)->setAutoconfigured(true)->setPublic(true);
+        //        $builder->autowire(TransitionListener::class)->setAutoconfigured(true)->setPublic(true);
+        //        $builder->autowire(PostLoadSetEnabledTransitionsListener::class)->setAutoconfigured(true)->setPublic(true);
 
         // Starts the workflow for a newly persisted entity, from the initial
         // place's own `next` — the thing #[Place(initial: true, next: [...])]
@@ -295,8 +286,8 @@ final class SurvosStateBundle extends AbstractUxBundle
 
         // Workflow listener wiring
         $builder->autowire(WorkflowListener::class)
-            ->setArgument('$workflowHelperService', new \Symfony\Component\DependencyInjection\Reference(WorkflowHelperService::class))
-            ->setArgument('$messageBus', new \Symfony\Component\DependencyInjection\Reference(MessageBusInterface::class))
+            ->setArgument('$workflowHelperService', new Reference(WorkflowHelperService::class))
+            ->setArgument('$messageBus', new Reference(MessageBusInterface::class))
             ->addTag('kernel.event_listener', ['event' => 'workflow.completed', 'method' => 'onCompleted'])
             ->addTag('kernel.event_listener', ['event' => 'workflow.entered', 'method' => 'onEntered']);
 
@@ -309,7 +300,6 @@ final class SurvosStateBundle extends AbstractUxBundle
 //            ->addTag('console.event_listener', ['event' => 'workflow.completed', 'method' => 'onCompleted'])
 //            ->addTag('kernel.event_listener', ['event' => 'workflow.entered', 'method' => 'onEntered'])
         ;
-
 
         $builder->setParameter('survos_state.entity_paths', $config['workflow_paths'] ?? ['%kernel.project_dir%/src/Workflow']);
         $builder->setParameter('survos_state.allow_force_place', $config['allow_force_place'] ?? '%kernel.debug%');
@@ -420,7 +410,7 @@ final class SurvosStateBundle extends AbstractUxBundle
         if ($builder->hasExtension('ux_icons')) {
             $builder->prependExtensionConfig('ux_icons', [
                 'aliases' => [
-                    'sitemap'   => 'tabler:sitemap',
+                    'sitemap' => 'tabler:sitemap',
                     'chart-pie' => 'tabler:chart-pie',
                 ],
             ]);

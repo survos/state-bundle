@@ -59,9 +59,9 @@ final class InitialPlaceKickoffListener
 
     public function __construct(
         private readonly WorkflowHelperService $workflowHelperService,
-        private readonly AsyncQueueLocator     $asyncQueueLocator,
-        private readonly MessageBusInterface   $messageBus,
-        private readonly LoggerInterface       $logger = new NullLogger(),
+        private readonly AsyncQueueLocator $asyncQueueLocator,
+        private readonly MessageBusInterface $messageBus,
+        private readonly LoggerInterface $logger = new NullLogger(),
     ) {
     }
 
@@ -72,7 +72,7 @@ final class InitialPlaceKickoffListener
 
     public function postFlush(PostFlushEventArgs $args): void
     {
-        if ($this->dispatching || $this->pending === []) {
+        if ($this->dispatching || [] === $this->pending) {
             return;
         }
 
@@ -81,7 +81,7 @@ final class InitialPlaceKickoffListener
             // A synchronous transition can persist dependencies and flush while
             // dispatching. Re-entrant postFlush leaves those rows pending; drain
             // them here so they start once without waiting for an unrelated flush.
-            while ($this->pending !== []) {
+            while ([] !== $this->pending) {
                 $entities = $this->pending;
                 $this->pending = [];
                 foreach ($entities as $entity) {
@@ -101,8 +101,8 @@ final class InitialPlaceKickoffListener
         }
 
         $definition = $workflow->getDefinition();
-        $initial    = $definition->getInitialPlaces()[0] ?? null;
-        if ($initial === null) {
+        $initial = $definition->getInitialPlaces()[0] ?? null;
+        if (null === $initial) {
             return;
         }
 
@@ -115,7 +115,7 @@ final class InitialPlaceKickoffListener
         }
 
         $next = (array) ($workflow->getMetadataStore()->getPlaceMetadata($initial)['next'] ?? []);
-        if ($next === []) {
+        if ([] === $next) {
             return;
         }
 
@@ -125,7 +125,7 @@ final class InitialPlaceKickoffListener
             }
 
             $id = $this->identifierFor($entity, $args);
-            if ($id === null) {
+            if (null === $id) {
                 $this->logger->warning('workflow kickoff: cannot resolve id for {class}', [
                     'class' => $entity::class,
                 ]);
@@ -167,7 +167,7 @@ final class InitialPlaceKickoffListener
         // ask it to, but the kickoff looked up 'Photo', missed, and returned null. The row was
         // then persisted at its initial place and simply sat there: no message, no error, no log
         // line, since a null workflow is also the ordinary "this entity has no workflow" answer.
-        if ($name === null) {
+        if (null === $name) {
             foreach ($byClass as $supported => $names) {
                 if (is_a($class, $supported, true)) {
                     $name = $names[0] ?? null;
@@ -176,7 +176,7 @@ final class InitialPlaceKickoffListener
             }
         }
 
-        if ($name === null) {
+        if (null === $name) {
             return null;
         }
 
@@ -201,11 +201,11 @@ final class InitialPlaceKickoffListener
             return null;
         }
 
-        if ($ids === []) {
+        if ([] === $ids) {
             return null;
         }
 
-        return \count($ids) === 1
+        return 1 === \count($ids)
             ? (string) array_values($ids)[0]
             : (json_encode($ids, JSON_UNESCAPED_SLASHES) ?: null);
     }

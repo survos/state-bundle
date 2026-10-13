@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Messenger\Stamp;
@@ -13,5 +14,6 @@ final class ContextStamp implements StampInterface
     public function __construct(
         public readonly string|int $value,
         public readonly string $key = 'context',
-    ) {}
+    ) {
+    }
 }

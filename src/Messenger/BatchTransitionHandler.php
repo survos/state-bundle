@@ -73,7 +73,7 @@ final class BatchTransitionHandler implements BatchHandlerInterface
                 return true;
             }
         }
-        if ($this->idleTimeout > 0 && $this->lastMessageAt !== null) {
+        if ($this->idleTimeout > 0 && null !== $this->lastMessageAt) {
             return ((int) ($this->batchClock ?? \Symfony\Component\Clock\Clock::get())->now()->format('U') - $this->lastMessageAt) >= $this->idleTimeout;
         }
 
@@ -110,7 +110,7 @@ final class BatchTransitionHandler implements BatchHandlerInterface
         $class = $first->className;
         $transition = $first->transitionName;
         $em = $this->managerRegistry->getManagerForClass($class);
-        if ($em === null) {
+        if (null === $em) {
             foreach ($group as [, $ack]) {
                 $ack->nack(new \LogicException("No entity manager maps $class"));
             }
@@ -130,7 +130,7 @@ final class BatchTransitionHandler implements BatchHandlerInterface
         $seen = [];
         foreach ($group as [$message, $ack]) {
             $entity = $byId[(string) $message->id] ?? null;
-            if ($entity === null) {
+            if (null === $entity) {
                 $this->logger->error('batch {transition}: missing {class} {id}', ['transition' => $transition, 'class' => $class, 'id' => $message->id]);
                 $ack->ack(['message' => "missing entity $class {$message->id}"]);
                 continue;
@@ -149,7 +149,7 @@ final class BatchTransitionHandler implements BatchHandlerInterface
             }
             $ready[] = [$entity, $message, $ack];
         }
-        if ($ready === []) {
+        if ([] === $ready) {
             return;
         }
 
@@ -172,7 +172,7 @@ final class BatchTransitionHandler implements BatchHandlerInterface
 
         $applied = [];
         foreach ($ready as [$entity, $message, $ack]) {
-            if ($this->bus !== null && $event->isReleased($entity)) {
+            if (null !== $this->bus && $event->isReleased($entity)) {
                 // Back to the per-message path: handled alone, by WorkflowHelperService, on the
                 // transition's own queue (stamped like every other dispatch site; unstamped it
                 // would run right here, inline, which is what releasing is meant to avoid).

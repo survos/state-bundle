@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\StateBundle\Twig;
 
 use Survos\StateBundle\Service\WorkflowHelperService;
@@ -38,7 +40,6 @@ class WorkflowExtension extends AbstractExtension
             new TwigFunction('workflow_const', [$this, 'getWorkflowConstant']),
             new TwigFunction('workflow_name', [$this, 'getWorkflowName']),
             new TwigFunction('entity_class', [$this, 'getClass']),
-
         ];
     }
 
@@ -54,19 +55,16 @@ class WorkflowExtension extends AbstractExtension
     }
 
     /**
-     * @param $subject
-     * @param $workflowName
      * @return string
      */
     public function workflowDiagram($subject = null, $workflowName = null)
     {
-        assert($subject || $workflowName, "must pass either a subject or workflowName");
+        assert($subject || $workflowName, 'must pass either a subject or workflowName');
+
         return $this->workflowHelper->workflowDiagram($subject, $workflowName);
     }
 
     /**
-     * @param $subject
-     * @param $workflowName
      * @return string
      */
     public function workflowDigraph($subject, $workflowName)
@@ -86,7 +84,7 @@ class WorkflowExtension extends AbstractExtension
         return $this->workflowHelper->getWorkflowByCode($name)
             ->getMetadataStore()
             ->getMetadata($key, $metadataSubject)
-            ;
+        ;
     }
 
     public function getWorkflowConstant(object|string $subjectOrWorkflow, string $constantName): mixed
@@ -98,6 +96,4 @@ class WorkflowExtension extends AbstractExtension
     {
         return $this->workflowHelper->getWorkflowNameForSubjectOrWorkflow($subjectOrWorkflow);
     }
-
-
 }

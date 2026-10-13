@@ -4,21 +4,19 @@ declare(strict_types=1);
 
 namespace Survos\StateBundle\Attribute;
 
-use Attribute;
-
-#[Attribute(Attribute::TARGET_CLASS_CONSTANT)]
+#[\Attribute(\Attribute::TARGET_CLASS_CONSTANT)]
 class Transition
 {
     public function __construct(
         public array|string $from,
         public array|string $to,
-        public ?string $info=null,
-        public ?string $description=null,
-        public ?string $guard=null,
-        public ?array $metadata=[],
-        public ?string $transport=null,
-        public ?bool $async=null,
-        public ?array $next=[],
+        public ?string $info = null,
+        public ?string $description = null,
+        public ?string $guard = null,
+        public ?array $metadata = [],
+        public ?string $transport = null,
+        public ?bool $async = null,
+        public ?array $next = [],
         /**
          * Handle this transition in batches of up to N subjects instead of one message at a time.
          * Implies async. Listeners registered with #[AsBatchTransitionListener] receive every
@@ -27,10 +25,10 @@ class Transition
          * #[AsTransitionListener]s can tell the bulk work was already done. See
          * BatchTransitionHandler.
          */
-        public ?int $batch=null,
-        public ?string $guardLabel=null,
+        public ?int $batch = null,
+        public ?string $guardLabel = null,
     ) {
-        if ($guardLabel !== null) {
+        if (null !== $guardLabel) {
             $this->metadata['guardLabel'] = $guardLabel;
         }
         if ($guard) {
@@ -48,16 +46,15 @@ class Transition
         }
         if ($this->transport) {
             $this->metadata['transport'] = $this->transport; // deprecated
-            $this->metadata['async'] = ($this->transport <> 'sync');
+            $this->metadata['async'] = ('sync' != $this->transport);
         }
         if ($this->next) {
             $this->metadata['next'] = $this->next;
         }
-        if ($this->batch !== null && $this->batch > 0) {
+        if (null !== $this->batch && $this->batch > 0) {
             $this->metadata['batch'] = $this->batch;
             $this->metadata['async'] = true;
         }
-
     }
 
     public function getFrom(): string|array

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Compiler;
@@ -21,22 +22,22 @@ final class StatePrependExtension
     public static function prepend(ContainerConfigurator $container, ContainerBuilder $builder, string $alias = 'survos_state'): void
     {
         $raw = $builder->getExtensionConfig($alias);
-        $queuePrefix       = '';
-        $workflowPaths     = [$builder->getParameter('kernel.project_dir') . '/src/Workflow'];
+        $queuePrefix = '';
+        $workflowPaths = [$builder->getParameter('kernel.project_dir').'/src/Workflow'];
         $asyncTransportDsn = 'doctrine://default';
         // Explicit switch, not DSN sniffing: async_transport_dsn is frequently an
         // unresolved "%env(...)%" placeholder at this point in compilation, so its
         // scheme can't be relied on to pick the transport-options shape.
-        $queueDriver       = 'doctrine';
+        $queueDriver = 'doctrine';
         // Symfony's own retry defaults, restated here because this pass reads RAW
         // extension config (getExtensionConfig) and so never sees the values
         // Configuration would have applied. Keep the two in sync with
         // SurvosStateBundle::configure().
-        $retryStrategy     = [
+        $retryStrategy = [
             'max_retries' => 3,
-            'delay'       => 1000,
-            'multiplier'  => 2,
-            'max_delay'   => 0,
+            'delay' => 1000,
+            'multiplier' => 2,
+            'max_delay' => 0,
         ];
         // Broker-only transport options, which is exactly why they belong here rather than in an
         // app's messenger.yaml: `queues` and `prefetch_count` are AMQP options and the Doctrine
@@ -44,9 +45,9 @@ final class StatePrependExtension
         // transport block broke every test that instantiates a transport the moment queue_driver
         // flipped to doctrine under when@test. The driver decides the options shape here already;
         // these ride along with it.
-        $maxPriority       = null;
-        $prefetchCount     = null;
-        $queueOptions      = [];
+        $maxPriority = null;
+        $prefetchCount = null;
+        $queueOptions = [];
 
         // In load order, so LATER config wins — the same precedence the
         // Configuration processor applies. ContainerBuilder::getExtensionConfig()
@@ -59,17 +60,33 @@ final class StatePrependExtension
         // this pass still built RabbitMQ transports. Verified by restoring the
         // array_reverse() and watching the parameter flip back.
         foreach ($raw as $cfg) {
-            if (isset($cfg['queue_prefix']))        { $queuePrefix       = (string) $cfg['queue_prefix']; }
-            if (isset($cfg['workflow_paths']))      { $workflowPaths     = (array)  $cfg['workflow_paths']; }
-            if (isset($cfg['async_transport_dsn'])) { $asyncTransportDsn = (string) $cfg['async_transport_dsn']; }
-            if (isset($cfg['queue_driver']))         { $queueDriver       = (string) $cfg['queue_driver']; }
+            if (isset($cfg['queue_prefix'])) {
+                $queuePrefix = (string) $cfg['queue_prefix'];
+            }
+            if (isset($cfg['workflow_paths'])) {
+                $workflowPaths = (array) $cfg['workflow_paths'];
+            }
+            if (isset($cfg['async_transport_dsn'])) {
+                $asyncTransportDsn = (string) $cfg['async_transport_dsn'];
+            }
+            if (isset($cfg['queue_driver'])) {
+                $queueDriver = (string) $cfg['queue_driver'];
+            }
             // Merged, not replaced, so an app can override just max_retries.
-            if (isset($cfg['retry_strategy']))      { $retryStrategy     = array_merge($retryStrategy, (array) $cfg['retry_strategy']); }
-            if (isset($cfg['max_priority']))        { $maxPriority       = (int)    $cfg['max_priority']; }
-            if (isset($cfg['prefetch_count']))      { $prefetchCount     = (int)    $cfg['prefetch_count']; }
+            if (isset($cfg['retry_strategy'])) {
+                $retryStrategy = array_merge($retryStrategy, (array) $cfg['retry_strategy']);
+            }
+            if (isset($cfg['max_priority'])) {
+                $maxPriority = (int) $cfg['max_priority'];
+            }
+            if (isset($cfg['prefetch_count'])) {
+                $prefetchCount = (int) $cfg['prefetch_count'];
+            }
             // Per-queue overrides, keyed by the queue this pass builds ("<workflow>.<transition>"),
             // merged so an app can set one queue's prefetch without restating the rest.
-            if (isset($cfg['queue_options']))       { $queueOptions      = array_merge($queueOptions, (array) $cfg['queue_options']); }
+            if (isset($cfg['queue_options'])) {
+                $queueOptions = array_merge($queueOptions, (array) $cfg['queue_options']);
+            }
         }
 
         // Published so other bundles (e.g. tabler-bundle's RabbitMqMenuSubscriber) can
@@ -78,8 +95,8 @@ final class StatePrependExtension
         $builder->setParameter('survos_state.queue_driver', $queueDriver);
         $builder->setParameter('survos_state.async_transport_dsn', $asyncTransportDsn);
 
-        $projectDir    = (string) $builder->getParameter('kernel.project_dir');
-        $workflowPaths = array_map(fn(string $p) => str_replace('%kernel.project_dir%', $projectDir, $p), $workflowPaths);
+        $projectDir = (string) $builder->getParameter('kernel.project_dir');
+        $workflowPaths = array_map(fn (string $p) => str_replace('%kernel.project_dir%', $projectDir, $p), $workflowPaths);
 
         // Auto-include workflow dirs from known optional bundles
         foreach ([
@@ -87,7 +104,7 @@ final class StatePrependExtension
         ] as $bundleClass) {
             if (class_exists($bundleClass)) {
                 $bundleDir = dirname((new \ReflectionClass($bundleClass))->getFileName());
-                $extraPath = $bundleDir . '/Workflow';
+                $extraPath = $bundleDir.'/Workflow';
                 if (is_dir($extraPath) && !in_array($extraPath, $workflowPaths, true)) {
                     $workflowPaths[] = $extraPath;
                 }
@@ -110,8 +127,8 @@ final class StatePrependExtension
         }
 
         // 2) Collect async transitions (+ seed initialTransitions safely)
-        $asyncByWorkflow    = [];
-        $batchByWorkflow    = []; // #[Transition(batch: N)] → [workflow][transition] => N
+        $asyncByWorkflow = [];
+        $batchByWorkflow = []; // #[Transition(batch: N)] → [workflow][transition] => N
         $initialTransitions = []; // ✅ CRITICAL: initialize!
 
         if (!empty($built['async_by_workflow']) && is_array($built['async_by_workflow'])) {
@@ -138,7 +155,9 @@ final class StatePrependExtension
                 }
                 foreach ((array) ($def['transitions'] ?? []) as $t) {
                     $tName = $t['name'] ?? null;
-                    if (!$tName) { continue; }
+                    if (!$tName) {
+                        continue;
+                    }
                     if (($t['metadata']['async'] ?? false) === true) {
                         $asyncByWorkflow[$wfName][$tName] = true;
                     }
@@ -162,11 +181,11 @@ final class StatePrependExtension
             // shares one physical vhost (one exchange+queue per transition, named
             // after the queue). Either way the prefix only matters when queue names
             // could collide across apps sharing the same broker/table.
-            $prefix = $queueDriver === 'doctrine'
+            $prefix = 'doctrine' === $queueDriver
                 ? ''
                 : QueueNameUtil::normalizePrefix($queuePrefix);
 
-            $tableName  = 'messenger_messages';
+            $tableName = 'messenger_messages';
             $transports = [];
             $transitionToQueueMap = [];
 
@@ -207,7 +226,7 @@ final class StatePrependExtension
                 $wfSlug = QueueNameUtil::normalizeSlug((string) $wfName);
                 foreach (array_keys($transitions) as $tName) {
                     $tSlug = QueueNameUtil::normalizeSlug((string) $tName);
-                    $queue = $prefix . $wfSlug . '.' . $tSlug;
+                    $queue = $prefix.$wfSlug.'.'.$tSlug;
 
                     $transports[$queue] = match ($queueDriver) {
                         // jwage/phpamqplib-messenger's minimal DSN form
@@ -220,7 +239,7 @@ final class StatePrependExtension
                         // survivable on RabbitMQ 4.3+; see $delayDurableSupported above for
                         // the whole story and for what happens when it isn't available.
                         'rabbitmq' => [
-                            'dsn'     => self::appendPathSegment($asyncTransportDsn, $queue),
+                            'dsn' => self::appendPathSegment($asyncTransportDsn, $queue),
                             'options' => self::brokerOptions(
                                 $delayDurableSupported
                                     ? ['auto_setup' => true, 'delay' => ['durable' => true]]
@@ -235,12 +254,12 @@ final class StatePrependExtension
                                 : ['max_retries' => 0],
                         ],
                         default => [
-                            'dsn'     => $asyncTransportDsn,
+                            'dsn' => $asyncTransportDsn,
                             'options' => [
                                 'table_name' => $tableName,
                                 'queue_name' => $queue,
                                 'auto_setup' => true, // creates the table in doctrine if it doesn't already exist
-//                                'use_notify' => true, // automatic with postgres
+                                //                                'use_notify' => true, // automatic with postgres
                                 'get_notify_timeout' => 30000,
                             ],
                             'retry_strategy' => $retryStrategy,
@@ -282,10 +301,10 @@ final class StatePrependExtension
     {
         $priority = isset($overrides['max_priority']) ? (int) $overrides['max_priority'] : $maxPriority;
         $prefetch = isset($overrides['prefetch_count']) ? (int) $overrides['prefetch_count'] : $prefetchCount;
-        if ($priority !== null && $priority > 0) {
+        if (null !== $priority && $priority > 0) {
             $options['queues'] = [$queue => ['arguments' => ['x-max-priority' => $priority]]];
         }
-        if ($prefetch !== null && $prefetch > 0) {
+        if (null !== $prefetch && $prefetch > 0) {
             $options['prefetch_count'] = $prefetch;
         }
 
@@ -295,7 +314,8 @@ final class StatePrependExtension
     private static function appendPathSegment(string $dsn, string $segment): string
     {
         [$base, $query] = str_contains($dsn, '?') ? explode('?', $dsn, 2) : [$dsn, null];
-        $base = rtrim($base, '/') . '/' . $segment;
-        return $query !== null ? $base . '?' . $query : $base;
+        $base = rtrim($base, '/').'/'.$segment;
+
+        return null !== $query ? $base.'?'.$query : $base;
     }
 }

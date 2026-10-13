@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Messenger\Middleware;
@@ -25,7 +26,7 @@ final class ContextStampingMiddleware implements MiddlewareInterface
             $existing = $envelope->all(ContextStamp::class);
             $already = [];
             foreach ($existing as $s) {
-                /** @var ContextStamp $s */
+                /* @var ContextStamp $s */
                 $already[$s->key.':'.$s->value] = true;
             }
 
@@ -43,7 +44,7 @@ final class ContextStampingMiddleware implements MiddlewareInterface
                 } else {
                     // assoc array → key/value pairs
                     foreach ($payload as $key => $val) {
-                        if ((is_string($key) && (is_string($val) || is_int($val)))) {
+                        if (is_string($key) && (is_string($val) || is_int($val))) {
                             $toAdd[] = new ContextStamp($val, $key);
                         }
                     }

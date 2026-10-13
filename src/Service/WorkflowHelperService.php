@@ -7,30 +7,25 @@ namespace Survos\StateBundle\Service;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
-use Survos\FieldBundle\Repository\QueryBuilderHelperInterface;
-
 use Survos\StateBundle\Message\TransitionMessage;
 use Symfony\Component\DependencyInjection\Attribute\AutowireLocator;
-use Symfony\Component\DependencyInjection\Attribute\TaggedLocator;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Process\Process;
 use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
-use Symfony\Component\Workflow\Dumper\GraphvizDumper;
-use Symfony\Component\Workflow\Dumper\StateMachineGraphvizDumper;
 use Symfony\Component\Workflow\Marking;
-use Symfony\Component\Workflow\Metadata\MetadataStoreInterface;
 use Symfony\Component\Workflow\Registry;
 use Symfony\Component\Workflow\StateMachine;
-use Symfony\Component\Workflow\Transition;
 use Symfony\Component\Workflow\SupportStrategy\InstanceOfSupportStrategy;
+use Symfony\Component\Workflow\Transition;
 use Symfony\Component\Workflow\Workflow;
 use Symfony\Component\Workflow\WorkflowInterface;
+
 use function Symfony\Component\String\u;
 
 /**
- * Generate Workflow Diagrams
+ * Generate Workflow Diagrams.
  *
  * @author Tac Tacelosky <tacman@gmail.com>
  */
@@ -42,14 +37,13 @@ class WorkflowHelperService
     public function __construct(
         /** @var WorkflowInterface[] */
         #[AutowireLocator('workflow.state_machine')] private ServiceLocator $workflows,
-        private EntityManagerInterface                                      $entityManager,
-        private ManagerRegistry                                             $managerRegistry,
+        private EntityManagerInterface $entityManager,
+        private ManagerRegistry $managerRegistry,
         private PropertyAccessorInterface $propertyAccessor,
-        private array                                                       $configuration,
-        private array                                                       $definitionClasses = [],
-        private ?LoggerInterface                                            $logger = null,
-    )
-    {
+        private array $configuration,
+        private array $definitionClasses = [],
+        private ?LoggerInterface $logger = null,
+    ) {
         $this->dumper = new SurvosStateMachineGraphVizDumper();
     }
 
@@ -61,11 +55,12 @@ class WorkflowHelperService
     /** @return array<string,WorkflowInterface> */
     public function getWorkflowsIndexedByName(): array
     {
-//        static $workflows=[];
+        //        static $workflows=[];
         $workflows = [];
         foreach ($this->workflows as $workflow) {
             $workflows[$workflow->getName()] = $workflow;
         }
+
         return $workflows;
     }
 
@@ -122,18 +117,12 @@ class WorkflowHelperService
     {
         $definitionClass = $this->getWorkflowDefinitionClass($subjectOrWorkflow);
         if (!$definitionClass) {
-            throw new \InvalidArgumentException(sprintf(
-                'Unable to resolve workflow definition for "%s".',
-                is_object($subjectOrWorkflow) ? $subjectOrWorkflow::class : $subjectOrWorkflow
-            ));
+            throw new \InvalidArgumentException(sprintf('Unable to resolve workflow definition for "%s".', is_object($subjectOrWorkflow) ? $subjectOrWorkflow::class : $subjectOrWorkflow));
         }
 
-        $constant = $definitionClass . '::' . $constantName;
+        $constant = $definitionClass.'::'.$constantName;
         if (!defined($constant)) {
-            throw new \InvalidArgumentException(sprintf(
-                'Workflow definition constant "%s" is not defined.',
-                $constant
-            ));
+            throw new \InvalidArgumentException(sprintf('Workflow definition constant "%s" is not defined.', $constant));
         }
 
         return constant($constant);
@@ -159,10 +148,7 @@ class WorkflowHelperService
     {
         $workflowName = $this->getWorkflowNameForSubjectOrWorkflow($subjectOrWorkflow);
         if (!$workflowName) {
-            throw new \InvalidArgumentException(sprintf(
-                'Unable to resolve workflow name for "%s".',
-                is_object($subjectOrWorkflow) ? $subjectOrWorkflow::class : $subjectOrWorkflow
-            ));
+            throw new \InvalidArgumentException(sprintf('Unable to resolve workflow name for "%s".', is_object($subjectOrWorkflow) ? $subjectOrWorkflow::class : $subjectOrWorkflow));
         }
 
         return $this->getWorkflowByCode($workflowName);
@@ -173,10 +159,7 @@ class WorkflowHelperService
         if (str_starts_with($constantOrValue, $prefix)) {
             $resolved = $this->getWorkflowConstant($subjectOrWorkflow, $constantOrValue);
             if (!is_string($resolved)) {
-                throw new \InvalidArgumentException(sprintf(
-                    'Workflow constant "%s" did not resolve to a string.',
-                    $constantOrValue
-                ));
+                throw new \InvalidArgumentException(sprintf('Workflow constant "%s" did not resolve to a string.', $constantOrValue));
             }
 
             return $resolved;
@@ -185,19 +168,19 @@ class WorkflowHelperService
         return $constantOrValue;
     }
 
-
     // @idea: pass in the repository to make the counts call.
     public function getMarkingData(WorkflowInterface $workflow, string $class, ?array $counts = null): array
     {
         $repo = $this->entityManager->getRepository($class);
         if (empty($counts)) {
             if (method_exists($repo, 'findBygetCountsByField')) {
-                $counts = $repo->findBygetCountsByField('marking'); //
+                $counts = $repo->findBygetCountsByField('marking');
             } else {
                 throw new \Exception("Marking data requires as findBygetCountsByField in the repository, implement Survos\FieldBundle\Repository\QueryBuilderHelperInterface");
             }
         }
-        return array_map(fn($marking) => array_merge([
+
+        return array_map(fn ($marking) => array_merge([
             'marking' => $marking,
             'count' => $counts[$marking] ?? null,
         ], $workflow->getMetadataStore()->getPlaceMetadata($marking)), $workflow->getDefinition()->getPlaces());
@@ -223,43 +206,36 @@ class WorkflowHelperService
         throw new \InvalidArgumentException(sprintf('Transition "%s" not found in the workflow.', $transitionName));
     }
 
-
     public function getWorkflow($subject, string $workflowName): WorkflowInterface
     {
-
         assert(array_key_exists($workflowName, $this->getWorkflowsIndexedByName()), "Unknown workflow: $workflowName");
+
         return $this->getWorkflowsIndexedByName()[$workflowName];
 
-//        /** @var WorkflowInterface $workflow */
-//        try {
-//            $workflow = $this->workflowRegistry->get($subject, $workflowName);
-//        } catch (\Exception $e) {
-//            return $e->getMessage(); // null;
-//        }
-//        return $workflow;
+        //        /** @var WorkflowInterface $workflow */
+        //        try {
+        //            $workflow = $this->workflowRegistry->get($subject, $workflowName);
+        //        } catch (\Exception $e) {
+        //            return $e->getMessage(); // null;
+        //        }
+        //        return $workflow;
     }
 
     public function workflowConstants(WorkflowInterface $workflow)
     {
-
-//        $workflow = $this->getWorkflow($subject, $workflowName);
+        //        $workflow = $this->getWorkflow($subject, $workflowName);
 
         // dump workflow constants with attributes
         $definition = $workflow->getDefinition();
         $workflowPlaces = $workflow->getDefinition()->getPlaces();
 
         foreach ($workflowPlaces as $code => $value) {
-
         }
 
-//        dd($workflowPlaces);
-
-
+        //        dd($workflowPlaces);
     }
 
     /**
-     * @param $subject
-     * @param $workflowName
      * @return string
      */
     public function workflowDiagramDigraph($subject = null, ?string $workflowName = null)
@@ -274,8 +250,8 @@ class WorkflowHelperService
 
         $markingStore = $workflow->getMarkingStore();
         $entityPlaces = $workflow->getDefinition()->getPlaces();
-//        dd($places);
-//        $entityPlaces = array_keys($workflow->getMarkingStore()->getMarking($subject)->getPlaces());
+        //        dd($places);
+        //        $entityPlaces = array_keys($workflow->getMarkingStore()->getMarking($subject)->getPlaces());
         if ($subject) {
             $marking = $workflow->getMarkingStore()->getMarking($subject);
             try {
@@ -292,7 +268,6 @@ class WorkflowHelperService
                     },
                     $entityPlaces
                 );
-
             } catch (\Exception $exception) {
                 $initial = $workflow->getDefinition()->getInitialPlaces()[0];
                 (new Marking())->mark($subject->marking ?? $initial);
@@ -300,14 +275,14 @@ class WorkflowHelperService
         } else {
             $marking = new Marking();
             // if there's no subject, just use the initial marking, unless something is passed in
-//            $marking = $definition->getInitialPlaces()[0];
+            //            $marking = $definition->getInitialPlaces()[0];
             $initial = $workflow->getDefinition()->getInitialPlaces()[0];
             $marking->mark($subject->marking ?? $initial);
         }
 
         // unset anything previously set
         $dot = $this->dumper->dump($definition, $marking, [
-            //graphviz docs http://www.graphviz.org/doc/info/attrs.html
+            // graphviz docs http://www.graphviz.org/doc/info/attrs.html
             'graph' => [
                 'bgcolor' => 'transparent',
                 'pad' => '0.35',
@@ -335,8 +310,6 @@ class WorkflowHelperService
     }
 
     /**
-     * @param $subject
-     * @param $workflowName
      * @return string
      */
     public function workflowDiagram($subject, $workflowName)
@@ -351,9 +324,10 @@ class WorkflowHelperService
             $process->mustRun();
 
             $svg = $process->getOutput();
-        } catch (\Exception $e) { //. if dot not installed
+        } catch (\Exception $e) { // . if dot not installed
             // @todo: configure paths to the .svg files (for filesystem and url)
             $svg = sprintf("<!-- return a static svg if dot isn't working --><img src='/svg/%s.svg' />", $workflowName);
+
             // return $svg; // hack
             return $svg;
         }
@@ -374,6 +348,7 @@ class WorkflowHelperService
         foreach ($this->configuration as $workflowName => $config) {
             $classesByCode[$workflowName] = $config['supports'];
         }
+
         return $classesByCode;
     }
 
@@ -384,14 +359,13 @@ class WorkflowHelperService
 
     public function getWorkflowsGroupedByClass(): array
     {
-
         /**
          * @var InstanceOfSupportStrategy $suportStrategy
-         * @var StateMachine $stateMachine
+         * @var StateMachine              $stateMachine
          */
         $workflowsByClass = [];
 
-//        $x = $this->getWorkflowsIndexedByName();
+        //        $x = $this->getWorkflowsIndexedByName();
 
         foreach ($this->configuration as $workflowName => $config) {
             $classes = $config['supports'];
@@ -403,10 +377,11 @@ class WorkflowHelperService
                 if (empty($workflowsByClass[$class])) {
                     $workflowsByClass[$class] = [];
                 }
-//                assert(array_key_exists($workflowName, $x), "$workflowName is missing in workflows " . join(',', array_keys($x)));
+                //                assert(array_key_exists($workflowName, $x), "$workflowName is missing in workflows " . join(',', array_keys($x)));
                 $workflowsByClass[$class][] = $workflowName;
             }
         }
+
         return $workflowsByClass;
     }
 
@@ -417,11 +392,7 @@ class WorkflowHelperService
         // zend.assertions=-1, so a bad code returned an undefined-index null there and
         // failed somewhere further along with no mention of the workflow name.
         if (!array_key_exists($code, $workflows)) {
-            throw new \InvalidArgumentException(sprintf(
-                'Unknown workflow "%s". Known: %s',
-                $code,
-                implode(', ', array_keys($workflows)) ?: '(none)',
-            ));
+            throw new \InvalidArgumentException(sprintf('Unknown workflow "%s". Known: %s', $code, implode(', ', array_keys($workflows)) ?: '(none)'));
         }
 
         return $workflows[$code];
@@ -455,7 +426,7 @@ class WorkflowHelperService
         $em = $this->managerRegistry->getManagerForClass($class) ?? $this->entityManager;
         $repo = $em->getRepository($class);
         $results = $repo->createQueryBuilder('s')
-            ->groupBy('s.' . $field)
+            ->groupBy('s.'.$field)
             ->select(["s.$field, count(s) as count"])
             ->getQuery()
             ->getArrayResult();
@@ -463,7 +434,7 @@ class WorkflowHelperService
         foreach ($results as $r) {
             assert(is_string($field));
             assert(is_array($r));
-//            dump($field, $r, $r['count'], $r['field']);
+            //            dump($field, $r, $r['count'], $r['field']);
             $key = $r[$field] ?? ''; // not really...
             if (is_array($key)) {
                 continue; // doctrine can't handle arrays for facets, just scalars
@@ -475,7 +446,7 @@ class WorkflowHelperService
             assert(is_integer($count));
             $counts[$key] = $count;
         }
-//        dd($counts);
+        //        dd($counts);
 
         return $counts;
     }
@@ -502,17 +473,17 @@ WHERE c.relkind = 'r'
 ORDER BY n.nspname, c.relname;");
 
                 $counts = array_combine(
-                    array_map(fn($r) => "{$r['table_name']}", $rows),
-                    array_map(fn($r) => (int)$r['estimated_rows'], $rows)
+                    array_map(fn ($r) => "{$r['table_name']}", $rows),
+                    array_map(fn ($r) => (int) $r['estimated_rows'], $rows)
                 );
             }
             $count = $counts[$repo->getClassMetadata()->getTableName()] ?? -1;
 
-//            // might be sqlite
-//            $count =  (int) $this->getEntityManager()->getConnection()->fetchOne(
-//                'SELECT reltuples::BIGINT FROM pg_class WHERE relname = :table',
-//                ['table' => $this->getClassMetadata()->getTableName()]
-//            );
+            //            // might be sqlite
+            //            $count =  (int) $this->getEntityManager()->getConnection()->fetchOne(
+            //                'SELECT reltuples::BIGINT FROM pg_class WHERE relname = :table',
+            //                ['table' => $this->getClassMetadata()->getTableName()]
+            //            );
         } catch (\Exception $e) {
             $count = -1;
         }
@@ -521,11 +492,11 @@ ORDER BY n.nspname, c.relname;");
         // Fallback to exact count
         if ($count < 0) {
             $count = $repo->count([]);
-//            // or $repo->count[]
-//            $count = (int)$repo->createQueryBuilder('e')
-//                ->select('COUNT(e)')
-//                ->getQuery()
-//                ->getSingleScalarResult();
+            //            // or $repo->count[]
+            //            $count = (int)$repo->createQueryBuilder('e')
+            //                ->select('COUNT(e)')
+            //                ->getQuery()
+            //                ->getSingleScalarResult();
         }
 
         return $count;
@@ -533,7 +504,7 @@ ORDER BY n.nspname, c.relname;");
 
     private function isMappedEntityClass(?string $class): bool
     {
-        if (!$class || $class === 'stdClass' || $class === \stdClass::class) {
+        if (!$class || 'stdClass' === $class || \stdClass::class === $class) {
             return false;
         }
 
@@ -543,9 +514,8 @@ ORDER BY n.nspname, c.relname;");
 
         // Check EVERY entity manager, not just the default — entities like DatasetInfo live on a
         // secondary EM (the 'dataset' sqlite registry), so the default EM's metadata wouldn't see them.
-        return $this->managerRegistry->getManagerForClass($class) !== null;
+        return null !== $this->managerRegistry->getManagerForClass($class);
     }
-
 
     #[AsMessageHandler]
     public function handleTransition(TransitionMessage $message)
@@ -576,6 +546,7 @@ ORDER BY n.nspname, c.relname;");
                 $blockerMessage = $blocker->getMessage();
                 $this->logger?->info($blockerMessage);
             }
+
             return [
                 'info' => "cannot $transition $shortName::$id ",
                 'message' => $blockerMessage,
@@ -593,7 +564,5 @@ ORDER BY n.nspname, c.relname;");
             'marking' => array_keys($marking->getPlaces()),
             'class' => $message->getClassName(),
         ];
-
     }
-
 }

@@ -1,17 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\StateBundle\Service;
 
 // worth reading: https://sketchviz.com/flowcharts-in-graphviz
 
-use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\Workflow\Definition;
 use Symfony\Component\Workflow\Dumper\GraphvizDumper;
 use Symfony\Component\Workflow\Marking;
 
 class SurvosGraphVizDumper extends GraphvizDumper
 {
-
     private string $placeShape = 'oval';
     private string $transitionShape = 'box';
 
@@ -20,24 +20,24 @@ class SurvosGraphVizDumper extends GraphvizDumper
         // everything into a small box; with xlabel gone, Graphviz's own
         // default sizing reads better without a forced ratio.
         'graph' => ['rankdir' => 'TB'],
-        'node'  => [
-            'fontsize'  => '8',
-            'fontname'  => 'Arial',
-            'color'     => 'lightBlue',
-            'style'     => 'filled',
+        'node' => [
+            'fontsize' => '8',
+            'fontname' => 'Arial',
+            'color' => 'lightBlue',
+            'style' => 'filled',
             'fixedsize' => 'false',
-            'width'     => '2',    // increased for wider nodes
-            'height'    => '1',    // optional: set min height
+            'width' => '2',    // increased for wider nodes
+            'height' => '1',    // optional: set min height
         ],
-        'edge'  => [
-            'fontsize'  => '7',
-            'fontname'  => 'Arial',
-            'color'     => '#333333',
+        'edge' => [
+            'fontsize' => '7',
+            'fontname' => 'Arial',
+            'color' => '#333333',
             'arrowhead' => 'normal',
             'arrowsize' => '0.5',
         ],
         // High-contrast place style
-        'place'      => ['shape' => 'oval', 'fillcolor' => '#FFD966'],
+        'place' => ['shape' => 'oval', 'fillcolor' => '#FFD966'],
         'transition' => ['shape' => 'box',  'fillcolor' => 'lightyellow'],
     ];
 
@@ -45,7 +45,7 @@ class SurvosGraphVizDumper extends GraphvizDumper
         'graph' => ['ratio' => 'compress', 'rankdir' => 'TB'],
         'node' => ['fontsize' => '8', 'fontname' => 'Arial', 'color' => '#333333',
             'fillcolor' => 'lightgreen',
-            'xlabel'=>"metadata",
+            'xlabel' => 'metadata',
             'fixedsize' => 'false', 'width' => '1'],
         'edge' => ['fontsize' => '7', 'fontname' => 'Arial',
             'color' => '#333333', 'arrowhead' => 'normal', 'arrowsize' => '0.5'],
@@ -65,12 +65,11 @@ class SurvosGraphVizDumper extends GraphvizDumper
         $label = $this->formatLabel($definition, $withMetadata, $options);
 
         return $this->startDot($options, $label)
-            . $this->addPlaces($places)
-            . $this->addTransitions($transitions)
-            . $this->addEdges($edges)
-            . $this->endDot();
+            .$this->addPlaces($places)
+            .$this->addTransitions($transitions)
+            .$this->addEdges($edges)
+            .$this->endDot();
     }
-
 
     /**
      * @internal
@@ -98,7 +97,6 @@ class SurvosGraphVizDumper extends GraphvizDumper
             } else {
                 $attributes['style'] = 'filled';
                 $attributes['fillcolor'] = 'lightgreen';
-
             }
             if ($withMetadata) {
                 // description is deliberately NOT surfaced here (was an unwrapped
@@ -134,25 +132,25 @@ class SurvosGraphVizDumper extends GraphvizDumper
 
         $transitions = [];
 
-//        $transitionsByName = [];
-//
-//        foreach ($definition->getTransitions() as $transition) {
-//            $name = $workflowMetadata->getMetadata('label', $transition) ?? $transition->getName();
-//
-//            if (!isset($transitionsByName[$name])) {
-//                $transitionsByName[$name] = [
-//                    'attributes' => [],
-//                    'metadata' => [],
-//                    'name' => $name,
-//                ];
-//            }
-//
-//            if ($withMetadata) {
-//                $transitionsByName[$name]['metadata'] += $workflowMetadata->getTransitionMetadata($transition);
-//            }
-//        }
-//
-//        return array_values($transitionsByName);
+        //        $transitionsByName = [];
+        //
+        //        foreach ($definition->getTransitions() as $transition) {
+        //            $name = $workflowMetadata->getMetadata('label', $transition) ?? $transition->getName();
+        //
+        //            if (!isset($transitionsByName[$name])) {
+        //                $transitionsByName[$name] = [
+        //                    'attributes' => [],
+        //                    'metadata' => [],
+        //                    'name' => $name,
+        //                ];
+        //            }
+        //
+        //            if ($withMetadata) {
+        //                $transitionsByName[$name]['metadata'] += $workflowMetadata->getTransitionMetadata($transition);
+        //            }
+        //        }
+        //
+        //        return array_values($transitionsByName);
 
         foreach ($definition->getTransitions() as $transition) {
             $attributes = ['shape' => $this->transitionShape, 'regular' => true];
@@ -171,7 +169,7 @@ class SurvosGraphVizDumper extends GraphvizDumper
                 unset($metadata['label']);
             }
 
-            $exists = (bool) array_filter($transitions, fn($t) => $t['name'] === $name);
+            $exists = (bool) array_filter($transitions, fn ($t) => $t['name'] === $name);
             if (!$exists) {
                 $transitions[] = [
                     'attributes' => $attributes,
@@ -179,23 +177,23 @@ class SurvosGraphVizDumper extends GraphvizDumper
                     'metadata' => $metadata,
                 ];
             }
-//            // we used to be able to have just one transition per graph and have the nodes right
-////            if (!$transitionData = array_filter($transitions, fn($t) => $t['name'] === $name))
-//            if (!$transitionData = $transitions[$name]??false)
-//            {
-//                $transitionData = [
-//                    'attributes' => $attributes,
-//                    'name' => $name,
-//                    'metadata' => $metadata,
-//                ];
-//                $transitions[$name] = $transitionData;
-//            } else {
-//                // merge the new attributes, especially from
-//                $transitionData['attributes'] += $attributes;
-//                $transitions[$name] = $transitionData;
-//                dd($transitionData, $transition);
-//            }
-//
+            //            // we used to be able to have just one transition per graph and have the nodes right
+            // //            if (!$transitionData = array_filter($transitions, fn($t) => $t['name'] === $name))
+            //            if (!$transitionData = $transitions[$name]??false)
+            //            {
+            //                $transitionData = [
+            //                    'attributes' => $attributes,
+            //                    'name' => $name,
+            //                    'metadata' => $metadata,
+            //                ];
+            //                $transitions[$name] = $transitionData;
+            //            } else {
+            //                // merge the new attributes, especially from
+            //                $transitionData['attributes'] += $attributes;
+            //                $transitions[$name] = $transitionData;
+            //                dd($transitionData, $transition);
+            //            }
+            //
         }
 
         return $transitions;
@@ -243,7 +241,7 @@ class SurvosGraphVizDumper extends GraphvizDumper
             if (!empty($place['metadata'])) {
                 $escapedLabel = \sprintf('<<B>%s</B>%s>', $this->escape($place['name']), $this->addMetadata($place['metadata']));
             } else {
-                $escapedLabel = '"' . $this->escape($place['name']) . '"';
+                $escapedLabel = '"'.$this->escape($place['name']).'"';
             }
 
             $code .= \sprintf("  transition_%s [label=%s,%s];\n",
@@ -296,7 +294,7 @@ class SurvosGraphVizDumper extends GraphvizDumper
 
         foreach ($edges as $edge) {
             if ('from' === $edge['direction']) {
-                $code .= \sprintf('  place_%s -> transition_%s [style="solid", comment="%s"];' . "\n",
+                $code .= \sprintf('  place_%s -> transition_%s [style="solid", comment="%s"];'."\n",
                     $this->dotize($edge['from']),
                     $this->dotize($edge['transition_number']),
                     $edge['from']
@@ -340,6 +338,7 @@ class SurvosGraphVizDumper extends GraphvizDumper
     {
         // inject slugger?
         return $id;
+
         return hash('sha1', $id);
     }
 
@@ -354,9 +353,10 @@ class SurvosGraphVizDumper extends GraphvizDumper
 
         if (is_string($value)) {
             $value = htmlspecialchars($value);
-//            $value = wordwrap($value, 20, "<BR/>", true);
+            //            $value = wordwrap($value, 20, "<BR/>", true);
         }
         $value = \is_bool($value) ? ($value ? '1' : '0') : addslashes($value);
+
         return $value;
     }
 
@@ -371,7 +371,7 @@ class SurvosGraphVizDumper extends GraphvizDumper
             $code[] = \sprintf('%s="%s"', $k, $this->escape($v));
         }
 
-        return $code ? ' ' . implode(' ', $code) : '';
+        return $code ? ' '.implode(' ', $code) : '';
     }
 
     /**
@@ -387,10 +387,10 @@ class SurvosGraphVizDumper extends GraphvizDumper
         $currentLabel = $options['label'] ?? '';
         $withMetadata = true;
 
-//        if (!$withMetadata) {
-//            // Only currentLabel to handle. If null, will be translated to empty string
-//            return \sprintf('"%s"', $this->escape($currentLabel));
-//        }
+        //        if (!$withMetadata) {
+        //            // Only currentLabel to handle. If null, will be translated to empty string
+        //            return \sprintf('"%s"', $this->escape($currentLabel));
+        //        }
         $workflowMetadata = $definition->getMetadataStore()->getWorkflowMetadata();
 
         if ('' === $currentLabel) {
@@ -430,28 +430,27 @@ class SurvosGraphVizDumper extends GraphvizDumper
                 switch ($key) {
                     case 'transport':
                         if ($value) {
-                            $code[] = "<BR/><BR/>Via: " . $value;
+                            $code[] = '<BR/><BR/>Via: '.$value;
                         }
                         break;
                     case 'next':
-                        $code[] = "<BR/><BR/>Then: ";
+                        $code[] = '<BR/><BR/>Then: ';
                         foreach ($value ?? [] as $nextValue) {
-//                            $code[] = $nextValue;
+                            //                            $code[] = $nextValue;
                             $code[] = \sprintf('<U>%s</U> ', $this->escape($nextValue));
                         }
-//                        count($value) > 1 && dd($code);
+                        //                        count($value) > 1 && dd($code);
                         break;
                     case 'guard':
-
                         $value = preg_replace('/\.(is|has)/', '.', $value);
                         $value = str_replace('()', '', $value);
                         $value = str_replace('subject.', '', $value);
                         if (preg_match('|is_granted\(" ?(.*?)" ?\)|', $value, $matches)) {
                             $value = str_replace($matches[0], $matches[1], $value);
-//                            $value =
-//                            dd($matches, $value);
+                            //                            $value =
+                            //                            dd($matches, $value);
                         }
-//                        dump($value);
+                        //                        dump($value);
                         $code[] = \sprintf('%s<U>%s</U>', '<BR/>',
                             $this->escape($value));
                         break;
@@ -467,15 +466,14 @@ class SurvosGraphVizDumper extends GraphvizDumper
                         // ignore, since the node is going to be that color
                         break;
                     default:
-                        if (is_array($value)) {dd($value, $key);}
+                        if (is_array($value)) {
+                            dd($value, $key);
+                        }
                         $code[] = \sprintf('%s%s: %s', '<BR/>', $this->escape($key), $this->escape($value));
-
                 }
             }
         }
 
         return $code ? implode('', $code) : '';
     }
-
-
 }

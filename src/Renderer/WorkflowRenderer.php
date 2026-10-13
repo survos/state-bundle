@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Symfony MakerBundle package.
  *
@@ -11,7 +13,6 @@
 
 namespace Survos\StateBundle\Renderer;
 
-use Doctrine\Inflector\Inflector;
 use Symfony\Bundle\MakerBundle\Generator;
 use Symfony\Bundle\MakerBundle\Str;
 use Symfony\Bundle\MakerBundle\Util\ClassNameDetails;
@@ -23,7 +24,7 @@ class WorkflowRenderer
 
     public function __construct(
         Generator $generator,
-        private EnglishInflector $inflector
+        private EnglishInflector $inflector,
     ) {
         $this->generator = $generator;
     }
@@ -33,7 +34,7 @@ class WorkflowRenderer
         array $formFields,
         ?ClassNameDetails $boundClassDetails = null,
         array $constraintClasses = [],
-        array $extraUseClasses = []
+        array $extraUseClasses = [],
     ) {
         $fieldTypeUseStatements = [];
         $fields = [];
@@ -66,13 +67,13 @@ class WorkflowRenderer
 
         $generatedFilename = $this->generator->generateClass(
             $formClassDetails->getFullName(),
-            __DIR__ . '/../Resources/skeleton/Request/ParamConverter/ParamConverter.tpl.php',
+            __DIR__.'/../Resources/skeleton/Request/ParamConverter/ParamConverter.tpl.php',
             $v = [
                 'entity_full_class_name' => $boundClassDetails ? $boundClassDetails->getFullName() : null,
                 'entity_class_name' => $boundClassDetails ? $boundClassDetails->getShortName() : null,
                 'form_fields' => $fields,
                 'entity_var_name' => $entityVarSingular,
-                'entity_unique_name' => $entityVarSingular . 'Id',
+                'entity_unique_name' => $entityVarSingular.'Id',
                 'field_type_use_statements' => $mergedTypeUseStatements,
                 'constraint_use_statements' => $constraintClasses,
                 'shortClassName' => $formClassDetails->getShortName(),

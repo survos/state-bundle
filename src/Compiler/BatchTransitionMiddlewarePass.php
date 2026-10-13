@@ -12,7 +12,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 /**
  * Puts BatchTransitionMiddleware and ContextStampingMiddleware on every message bus, just before
  * send_message. (ContextStampingMiddleware used to carry a bare `messenger.middleware` tag, which
- * meant "every bus" until Symfony 8.2 rejected tags without a `bus` attribute.)
+ * meant "every bus" until Symfony 8.2 rejected tags without a `bus` attribute.).
  *
  * Why a compiler pass and not a prepended `framework.messenger.buses.*.middleware`: that node does
  * not deep-merge, so every bundle that prepends it REPLACES the others' lists and one wins.
@@ -35,7 +35,7 @@ final class BatchTransitionMiddlewarePass implements CompilerPassInterface
     private function addToBuses(ContainerBuilder $container, string $class): void
     {
         foreach (array_keys($container->findTaggedServiceIds('messenger.bus')) as $busId) {
-            $param = $busId . '.middleware';
+            $param = $busId.'.middleware';
             if (!$container->hasParameter($param)) {
                 continue;
             }
@@ -44,7 +44,7 @@ final class BatchTransitionMiddlewarePass implements CompilerPassInterface
                 continue;
             }
             $at = array_search('send_message', array_column($middleware, 'id'), true);
-            array_splice($middleware, $at === false ? \count($middleware) : $at, 0, [['id' => $class, 'arguments' => []]]);
+            array_splice($middleware, false === $at ? \count($middleware) : $at, 0, [['id' => $class, 'arguments' => []]]);
             $container->setParameter($param, $middleware);
         }
     }

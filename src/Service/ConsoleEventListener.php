@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Service;
@@ -6,24 +7,13 @@ namespace Survos\StateBundle\Service;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Survos\StateBundle\Message\TransitionMessage;
 use Symfony\Component\Console\ConsoleEvents;
 use Symfony\Component\Console\Event\ConsoleCommandEvent;
 use Symfony\Component\Console\Event\ConsoleErrorEvent;
 use Symfony\Component\Console\Event\ConsoleTerminateEvent;
-use Symfony\Component\DependencyInjection\Attribute\AutowireLocator;
-use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
-use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
-use Symfony\Component\Workflow\Attribute\AsCompletedListener;
-use Symfony\Component\Workflow\Attribute\AsEnteredListener;
-use Symfony\Component\Workflow\Event\CompletedEvent;
-use Symfony\Component\Workflow\Event\EnteredEvent;
 use Symfony\Component\Workflow\WorkflowInterface;
-use Zenstruck\Messenger\Monitor\Stamp\DescriptionStamp;
-use Zenstruck\Messenger\Monitor\Stamp\TagStamp;
 
 final class ConsoleEventListener
 {
@@ -34,7 +24,8 @@ final class ConsoleEventListener
         private EntityManagerInterface $entityManager,
         private AsyncQueueLocator $asyncQueueLocator,
         private LoggerInterface $logger = new NullLogger(),
-    ) {}
+    ) {
+    }
 
     #[AsEventListener(event: ConsoleEvents::COMMAND, priority: 0)]
     public function onCommand(ConsoleCommandEvent $event): void
@@ -93,6 +84,7 @@ final class ConsoleEventListener
         $cmd = $event->getCommand();
         $output = $event->getOutput();
         $code = $event->getExitCode();
+
         return;
 
         $output->writeln(sprintf(

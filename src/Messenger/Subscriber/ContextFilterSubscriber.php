@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Messenger\Subscriber;
@@ -15,8 +16,9 @@ use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 final class ContextFilterSubscriber
 {
     public function __construct(
-        private readonly string $filterEnvName = 'CONTEXT_STAMP'
-    ) {}
+        private readonly string $filterEnvName = 'CONTEXT_STAMP',
+    ) {
+    }
 
     public function __invoke(WorkerMessageReceivedEvent $event): void
     {
@@ -26,23 +28,23 @@ final class ContextFilterSubscriber
         $envName = \getenv('STATE_FILTER_ENV') ?: $envName;
 
         $raw = \getenv($envName);
-        if ($raw === false || $raw === '') {
+        if (false === $raw || '' === $raw) {
             return; // filter off
         }
 
-        $allowed = array_values(array_filter(array_map('trim', explode(',', $raw)), static fn($v) => $v !== ''));
-        if ($allowed === []) {
+        $allowed = array_values(array_filter(array_map('trim', explode(',', $raw)), static fn ($v) => '' !== $v));
+        if ([] === $allowed) {
             return;
         }
 
         /** @var ContextStamp|null $stamp */
         $stamp = $event->getEnvelope()->last(ContextStamp::class);
-        if (!$stamp || !in_array((string)$stamp->value, array_map('strval', $allowed), true)) {
+        if (!$stamp || !in_array((string) $stamp->value, array_map('strval', $allowed), true)) {
             $event->shouldHandle(false);
         }
-//        if ($event->shouldHandle()) {
-//            dd($stamp, $event->getEnvelope());
-//        }
-//        dump($stamp, $event->shouldHandle());
+        //        if ($event->shouldHandle()) {
+        //            dd($stamp, $event->getEnvelope());
+        //        }
+        //        dump($stamp, $event->shouldHandle());
     }
 }

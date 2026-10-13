@@ -1,19 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\StateBundle\Traits;
 
 use Survos\StateBundle\Message\TransitionMessage;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Workflow\Transition;
 use Symfony\Component\Workflow\WorkflowInterface;
+
 use function Symfony\Component\String\u;
 
 trait HandleTransitionsTrait
 {
     public function handleTransitionButtons(
-        ?WorkflowInterface $workflow=null,
-        ?string $transition=null,
-        ?MarkingInterface $entity=null,
+        ?WorkflowInterface $workflow = null,
+        ?string $transition = null,
+        ?MarkingInterface $entity = null,
         ?MessageBusInterface $bus = null,
     ): ?string {
         if (!$transition) {
@@ -21,10 +24,11 @@ trait HandleTransitionsTrait
         }
         // @todo: make a constant and inject into twig
         // reset does NOT run any other services, just the marking
-        if ($transition === '_reset') {
+        if ('_reset' === $transition) {
             $entity->setMarking(null); // force reset
             $workflow->getMarking($entity);
-            return "marking has been reset to " . $entity->getMarking();
+
+            return 'marking has been reset to '.$entity->getMarking();
         }
         $flashMessage = null;
         // use message handler instead.
@@ -48,18 +52,19 @@ trait HandleTransitionsTrait
             $message = (new TransitionMessage($entity->getId(), $entity::class, $tName));
             $envelope = $bus->dispatch($message);
             //            dd($envelope, $message);
-            $flashMessage = $message::class . ' has been dispatched, ' . $tName . " will happen in the message handler.";
+            $flashMessage = $message::class.' has been dispatched, '.$tName.' will happen in the message handler.';
         } else {
-            assert($workflow->can($entity, $transition), sprintf("%s cannot apply transition %s from %s", $entity, $transition, $entity->getMarking()));
+            assert($workflow->can($entity, $transition), sprintf('%s cannot apply transition %s from %s', $entity, $transition, $entity->getMarking()));
             $workflow->apply($entity, $transition);
-            $flashMessage = $transition . ' has been applied.';
+            $flashMessage = $transition.' has been applied.';
         }
+
         return $flashMessage;
     }
 
     public function dispatchMessage(WorkflowInterface $workflow, $transition, MarkingInterface $entity)
     {
-        assert($workflow->can($entity, $transition), sprintf("%s cannot apply transition %s from %s", $entity, $transition, $entity->getMarking()));
+        assert($workflow->can($entity, $transition), sprintf('%s cannot apply transition %s from %s', $entity, $transition, $entity->getMarking()));
         $workflow->apply($entity, $transition);
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Messenger\Middleware;
@@ -30,7 +31,8 @@ final class AsyncQueueRoutingMiddleware implements MiddlewareInterface
     public function __construct(
         private AsyncQueueLocator $locator,
         private LoggerInterface $logger = new NullLogger(),
-    ) {}
+    ) {
+    }
 
     public function handle(Envelope $envelope, StackInterface $stack): Envelope
     {
@@ -61,7 +63,7 @@ final class AsyncQueueRoutingMiddleware implements MiddlewareInterface
         if ($queue) {
             $this->logger->debug('[AsyncQueueRouting] stamping transport', [
                 'transition' => $transition,
-                'transport'  => $queue,
+                'transport' => $queue,
             ]);
             $envelope = $envelope->with(new TransportNamesStamp([$queue]));
         }

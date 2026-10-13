@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\StateBundle\Traits;
 
 use Doctrine\ORM\Mapping as ORM;
@@ -13,16 +15,16 @@ use function Symfony\Component\String\u;
 trait MarkingTrait
 {
     #[ORM\Column(type: 'string', length: 32, nullable: true)]
-    #[Groups(['transition', 'minimum', 'marking','searchable'])]
+    #[Groups(['transition', 'minimum', 'marking', 'searchable'])]
     public ?string $marking = null; // self::INITIAL_MARKING;
 
-//    /** Mirror workflow marking into the base::$status for external tools. */
-//    public string $marking {
-//        get => $this->getMarking();
-//        set => ($this->setMarking($value), $this->status = $value);
-//    }
+    //    /** Mirror workflow marking into the base::$status for external tools. */
+    //    public string $marking {
+    //        get => $this->getMarking();
+    //        set => ($this->setMarking($value), $this->status = $value);
+    //    }
 
-private array $markingHistory = [];
+    private array $markingHistory = [];
 
     private ?\DateTime $lastTransitionTime = null;
 
@@ -31,8 +33,7 @@ private array $markingHistory = [];
 
     public function getMarkingData(WorkflowInterface $workflow, ?array $counts = null): array
     {
-        return array_map(fn ($marking) =>
-        array_merge([
+        return array_map(fn ($marking) => array_merge([
             'marking' => $marking,
             'count' => $counts[$marking] ?? null,
         ], $workflow->getMetadataStore()->getPlaceMetadata($marking)), $workflow->getDefinition()->getPlaces());
@@ -45,12 +46,12 @@ private array $markingHistory = [];
 
     /**
      *   Note : type must be 'method', see https://symfony.com/blog/new-in-symfony-4-3-workflow-improvements#added-a-context-to-workflow-apply
-     *   get the context with $event->getContext();
-     * @param string $marking
+     *   get the context with $event->getContext();.
      */
     public function setMarking(?string $marking, $context = []): self
     {
         $this->marking = $marking;
+
         return $this;
     }
 
@@ -58,7 +59,6 @@ private array $markingHistory = [];
     {
         return $this->marking; // go through trans?  at least titleCase?
     }
-
 
     public function hasMarking(string $marking): bool
     {
@@ -118,9 +118,6 @@ private array $markingHistory = [];
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function getMarkingHistoryDisplay(): string
     {
         $text = '';
@@ -136,7 +133,7 @@ private array $markingHistory = [];
                 preg_replace('/\+00:?00$/', 'Z', $h['timestamp'])
             );
             if ($h['comment']) {
-                $text .= ' [' . $h['comment'] . ']';
+                $text .= ' ['.$h['comment'].']';
             }
         }
 
@@ -157,13 +154,16 @@ private array $markingHistory = [];
 
     public function getWorkflowName(): string
     {
-        if (defined($this::class . '::WORKFLOW')) {
-            $name = constant($this::class . '::WORKFLOW');
+        if (defined($this::class.'::WORKFLOW')) {
+            $name = constant($this::class.'::WORKFLOW');
         } else {
             $name = (new \ReflectionClass($this))->getShortName();
         }
+
         return strtolower($name);
+
         return $name;
+
         return get_class($this);
         // dd($name, __METHOD__);
         dd(get_class($this), __METHOD__);
@@ -173,6 +173,7 @@ private array $markingHistory = [];
     {
         // set by the doctrine postLoad listener
         $this->enabledTransitions = $enabledTransitions;
+
         return $this;
     }
 
@@ -186,8 +187,9 @@ private array $markingHistory = [];
         $enabled = $this->getEnabledTransitions();
         assert(is_array($this->getEnabledTransitions()));
         assert(array_is_list($enabled));
-//        dump($enabled);
-//        dd($this->getEnabledTransitions());
+
+        //        dump($enabled);
+        //        dd($this->getEnabledTransitions());
         return array_map(fn (Transition|string $transition) => is_string($transition) ? $transition : $transition->getName(), $this->getEnabledTransitions());
     }
 
@@ -199,12 +201,14 @@ private array $markingHistory = [];
     public static function getFlowCodes($prefix = 'WORKFLOW')
     {
         $oClass = new \ReflectionClass(__CLASS__);
+
         return array_filter($oClass->getConstants(), fn ($key) => $prefix ? u($key)->startsWith($prefix) : true, ARRAY_FILTER_USE_KEY);
     }
 
     public static function getConstants(?string $prefix = null)
     {
         $oClass = new \ReflectionClass(__CLASS__);
+
         return array_filter($oClass->getConstants(), fn ($key) => $prefix ? u($key)->startsWith($prefix) : true, ARRAY_FILTER_USE_KEY);
     }
 }

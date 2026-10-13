@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Util;
@@ -33,18 +34,18 @@ final class QueryFilters
             }
 
             $parameter = str_replace('.', '_', (string) $field);
-            if ($operator === 'isnull') {
+            if ('isnull' === $operator) {
                 $isNull = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-                $qb->andWhere(sprintf($alias.'.%s IS %sNULL', $field, $isNull === false ? 'NOT ' : ''));
+                $qb->andWhere(sprintf($alias.'.%s IS %sNULL', $field, false === $isNull ? 'NOT ' : ''));
                 continue;
             }
 
-            if (is_string($value) && strtolower($value) === 'null') {
+            if (is_string($value) && 'null' === strtolower($value)) {
                 $qb->andWhere(sprintf($alias.'.%s IS NULL', $field));
                 continue;
             }
 
-            if (is_string($value) && strtolower($value) === '!null') {
+            if (is_string($value) && '!null' === strtolower($value)) {
                 $qb->andWhere(sprintf($alias.'.%s IS NOT NULL', $field));
                 continue;
             }
@@ -74,5 +75,5 @@ final class QueryFilters
             }
             $qb->setParameter($parameter, $value);
         }
-        }
+    }
 }

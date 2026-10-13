@@ -1,8 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\StateBundle\Service;
 
-use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\Workflow\Definition;
 use Symfony\Component\Workflow\Dumper\GraphvizDumper;
 use Symfony\Component\Workflow\Marking;
@@ -14,24 +15,24 @@ class SurvosGraphVizDumper3 extends GraphvizDumper
 
     protected static array $defaultOptions = [
         'graph' => ['ratio' => 'compress', 'rankdir' => 'TB'],
-        'node'  => [
-            'fontsize'  => '8',
-            'fontname'  => 'Arial',
-            'color'     => 'lightBlue',
-            'style'     => 'filled',
+        'node' => [
+            'fontsize' => '8',
+            'fontname' => 'Arial',
+            'color' => 'lightBlue',
+            'style' => 'filled',
             'fixedsize' => 'false',
-            'width'     => '3',
-            'height'    => '1.2',
-            'margin'    => '0.3,0.2'
+            'width' => '3',
+            'height' => '1.2',
+            'margin' => '0.3,0.2',
         ],
-        'edge'  => [
-            'fontsize'  => '7',
-            'fontname'  => 'Arial',
-            'color'     => '#333333',
+        'edge' => [
+            'fontsize' => '7',
+            'fontname' => 'Arial',
+            'color' => '#333333',
             'arrowhead' => 'normal',
             'arrowsize' => '0.5',
         ],
-        'place'      => ['shape' => 'oval', 'fillcolor' => '#FFD966'],
+        'place' => ['shape' => 'oval', 'fillcolor' => '#FFD966'],
         'transition' => ['shape' => 'box',  'fillcolor' => 'lightyellow'],
     ];
 
@@ -49,10 +50,10 @@ class SurvosGraphVizDumper3 extends GraphvizDumper
         $label = $this->formatLabel($definition, $withMetadata, $options);
 
         return $this->startDot($options, $label)
-            . $this->addPlaces($places, $withMetadata)
-            . $this->addTransitions($transitions, $withMetadata)
-            . $this->addEdges($edges)
-            . $this->endDot();
+            .$this->addPlaces($places, $withMetadata)
+            .$this->addTransitions($transitions, $withMetadata)
+            .$this->addEdges($edges)
+            .$this->endDot();
     }
 
     protected function addPlaces(array $places, bool $withMetadata = false): string
@@ -69,21 +70,21 @@ class SurvosGraphVizDumper3 extends GraphvizDumper
 
             $metadataHtml = $withMetadata ? $this->addMetadataTable($placeName, $place['attributes']['metadata'] ?? []) : $this->escape($placeName);
 
-            if ($place['attributes']['metadata']??false) {
+            if ($place['attributes']['metadata'] ?? false) {
                 $place['attributes']['metadata'] = json_encode($place['attributes']['metadata']);
             }
-//            if ($place['attributes']['metadata']['next']??false)
-//            {
-//                $place['attributes']['metadata']['next'] = join(',', $place['attributes']['metadata']['next']);
-//                dd($place);
-//            }
+            //            if ($place['attributes']['metadata']['next']??false)
+            //            {
+            //                $place['attributes']['metadata']['next'] = join(',', $place['attributes']['metadata']['next']);
+            //                dd($place);
+            //            }
             $code .= sprintf(
                 "  place_%s [label=<%s>, shape=%s%s];\n",
                 $this->dotize($id),
                 $metadataHtml,
                 $this->placeShape,
                 'attributes',
-//                $this->addAttributes($place['attributes'])
+                //                $this->addAttributes($place['attributes'])
             );
         }
 
@@ -118,20 +119,20 @@ class SurvosGraphVizDumper3 extends GraphvizDumper
         $rows = [sprintf('<TR><TD><B>%s</B></TD></TR>', $this->escape($title))];
 
         foreach ($metadata as $key => $value) {
-            if ($key === 'bg_color') {
+            if ('bg_color' === $key) {
                 continue;
             }
-//            if (is_array($value)) {
-//                dd($value, $metadata);
-//            }
+            //            if (is_array($value)) {
+            //                dd($value, $metadata);
+            //            }
             $escapedValue = is_array($value)
                 ? $this->escape(implode(', ', array_map('strval', $value)))
                 : $this->escape($value);
             $escapedValue = strip_tags($escapedValue);
             str_contains($escapedValue, '<n>') && dd($escapedValue);
 
-//            $escapedValue = $this->escape($value);
-            $rows[] = sprintf('<TR><TD><FONT POINT-SIZE="7">%s%s</FONT></TD></TR>', $key === 'description' ? '<I>' : '', $escapedValue . ($key === 'description' ? '</I>' : ''));
+            //            $escapedValue = $this->escape($value);
+            $rows[] = sprintf('<TR><TD><FONT POINT-SIZE="7">%s%s</FONT></TD></TR>', 'description' === $key ? '<I>' : '', $escapedValue.('description' === $key ? '</I>' : ''));
         }
 
         return sprintf('<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="1">%s</TABLE>', implode('', $rows));

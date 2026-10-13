@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 namespace Survos\StateBundle\Traits;
 
 use Symfony\Component\Form\Extension\Core\Type\SubmitType;
@@ -24,13 +23,13 @@ trait TransitionsBuilderTrait
                     'attr' => [
                         'style' => 'float: left',
                         'class' => sprintf(
-                            "btn btn-sm float-left transition transition-%s %s",
+                            'btn btn-sm float-left transition transition-%s %s',
                             $transition->getName(),
                             $metadataStore->getTransitionMetadata($transition)['class'] ?? ''
                         ),
                     ],
                 ]);
-            if (($transitionMetadata['frequency'] ?? 'low') <> 'low') {
+            if (($transitionMetadata['frequency'] ?? 'low') != 'low') {
             }
         }
         try {
@@ -38,13 +37,13 @@ trait TransitionsBuilderTrait
         }
 
         // really we should be checking if new or not, can't save w/o transition if new.  Or maybe we can.  Hmm.
-            $builder->add('save_without_transitions', SubmitType::class, [
-                'label' => "Update (no transition)",
-                'attr' => [
-                    'style' => 'float: right',
-                    'class' => "btn btn-sm btn-primary float-right",
-                ],
-            ]);
+        $builder->add('save_without_transitions', SubmitType::class, [
+            'label' => 'Update (no transition)',
+            'attr' => [
+                'style' => 'float: right',
+                'class' => 'btn btn-sm btn-primary float-right',
+            ],
+        ]);
         if ($entity->getId()) {
         }
     }

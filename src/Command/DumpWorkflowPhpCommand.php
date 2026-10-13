@@ -1,19 +1,18 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Command;
 
-use Survos\StateBundle\Attribute\Place;
-use Survos\StateBundle\Attribute\Transition;
-use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Argument;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
-use Symfony\Component\Workflow\WorkflowInterface;
 use Symfony\Component\Workflow\StateMachine;
 use Symfony\Component\Workflow\Transition as SfTransition;
+use Symfony\Component\Workflow\WorkflowInterface;
 
 #[AsCommand(
     name: 'state:workflow:dump-php',
@@ -28,7 +27,7 @@ final class DumpWorkflowPhpCommand
         #[AutowireIterator('workflow.workflow')]
         iterable $workflows = [],
         #[AutowireIterator('workflow.state_machine')]
-        iterable $stateMachines = []
+        iterable $stateMachines = [],
     ) {
         foreach ($workflows as $wf) {
             $this->byName[$this->inferName($wf)] = $wf;
@@ -43,10 +42,11 @@ final class DumpWorkflowPhpCommand
         #[Argument('Workflow name to dump')] string $name,
         #[Option('Target PHP namespace', 'namespace')] string $namespace = 'App\\Workflow',
         #[Option('Interface name to generate (default derived from workflow name)', 'interface')] ?string $iface = null,
-        #[Option('Write to path (otherwise stdout)', 'output')] ?string $output = null
+        #[Option('Write to path (otherwise stdout)', 'output')] ?string $output = null,
     ): int {
         if (!isset($this->byName[$name])) {
             $io->error("Workflow '$name' not found.");
+
             return Command::FAILURE;
         }
         $wf = $this->byName[$name];
@@ -57,12 +57,12 @@ final class DumpWorkflowPhpCommand
 
         $iface ??= $this->normalizeInterfaceName($name);
         $initials = $def->getInitialPlaces();
-        $initialConst = ($type === 'state_machine' && $initials) ? ($initials[0] ?? null) : null;
+        $initialConst = ('state_machine' === $type && $initials) ? ($initials[0] ?? null) : null;
 
         $placeConsts = [];
         foreach ($def->getPlaces() as $place) {
-            $cName = $this->constify('PLACE_' . $place);
-            $meta  = $mds->getPlaceMetadata($place) ?? [];
+            $cName = $this->constify('PLACE_'.$place);
+            $meta = $mds->getPlaceMetadata($place) ?? [];
             [$placeArgs, $metaLeftovers] = $this->splitPlaceArgs($meta);
 
             $attrPieces = [];
@@ -80,31 +80,31 @@ final class DumpWorkflowPhpCommand
         $transConsts = [];
         foreach ($def->getTransitions() as $t) {
             $tName = $t->getName() ?? $this->makeTransitionName($t);
-            $cName = $this->constify('TRANSITION_' . $tName);
+            $cName = $this->constify('TRANSITION_'.$tName);
 
             $from = $t->getFroms();
-            $to   = $t->getTos();
+            $to = $t->getTos();
             $meta = $mds->getTransitionMetadata($t) ?? [];
 
             $guard = $meta['guard'] ?? null;
             unset($meta['guard']);
 
             $explicit = [];
-            foreach (['info','description','async','next'] as $k) {
+            foreach (['info', 'description', 'async', 'next'] as $k) {
                 if (\array_key_exists($k, $meta)) {
-                    $explicit[$k] = $k === 'next' ? (array) $meta[$k] : $meta[$k];
+                    $explicit[$k] = 'next' === $k ? (array) $meta[$k] : $meta[$k];
                     unset($meta[$k]);
                 }
             }
 
             $args = [
                 $this->namedArg('from', $from),
-                $this->namedArg('to',   $to),
+                $this->namedArg('to', $to),
             ];
             foreach ($explicit as $k => $v) {
                 $args[] = $this->namedArg($k, $v);
             }
-            if ($guard !== null) {
+            if (null !== $guard) {
                 $args[] = $this->namedArg('guard', $guard);
             }
             if ($meta) {
@@ -119,7 +119,7 @@ final class DumpWorkflowPhpCommand
         $lines[] = '<?php';
         $lines[] = 'declare(strict_types=1);';
         $lines[] = '';
-        $lines[] = 'namespace ' . $namespace . ';';
+        $lines[] = 'namespace '.$namespace.';';
         $lines[] = '';
         $lines[] = 'use Survos\\StateBundle\\Attribute\\Place;';
         $lines[] = 'use Survos\\StateBundle\\Attribute\\Transition;';
@@ -142,7 +142,7 @@ final class DumpWorkflowPhpCommand
             $lines[] = implode("\n", $transConsts);
         }
         $lines[] = '}';
-        $code = implode("\n", $lines) . "\n";
+        $code = implode("\n", $lines)."\n";
 
         if ($output) {
             @mkdir(\dirname($output), 0775, true);
@@ -162,14 +162,16 @@ final class DumpWorkflowPhpCommand
 
     private function normalizeInterfaceName(string $name): string
     {
-        $studly = preg_replace_callback('/(^|_)([a-z])/i', fn($m) => strtoupper($m[2]), $name);
-        return $studly . 'Workflow';
+        $studly = preg_replace_callback('/(^|_)([a-z])/i', fn ($m) => strtoupper($m[2]), $name);
+
+        return $studly.'Workflow';
     }
 
     private function constify(string $raw): string
     {
         $c = strtoupper(preg_replace('/[^A-Za-z0-9]+/', '_', $raw));
         $c = preg_replace('/_{2,}/', '_', $c);
+
         return rtrim($c, '_');
     }
 
@@ -179,9 +181,9 @@ final class DumpWorkflowPhpCommand
         $args = [];
         $left = $meta;
 
-        foreach (['info','description','bgColor','next'] as $k) {
+        foreach (['info', 'description', 'bgColor', 'next'] as $k) {
             if (\array_key_exists($k, $left)) {
-                $args[$k] = $k === 'next' ? (array) $left[$k] : $left[$k];
+                $args[$k] = 'next' === $k ? (array) $left[$k] : $left[$k];
                 unset($left[$k]);
             }
         }
@@ -192,19 +194,20 @@ final class DumpWorkflowPhpCommand
     private function makeTransitionName(SfTransition $t): string
     {
         $from = implode('_', (array) $t->getFroms());
-        $to   = implode('_', (array) $t->getTos());
-        return 'from_' . $from . '_to_' . $to;
+        $to = implode('_', (array) $t->getTos());
+
+        return 'from_'.$from.'_to_'.$to;
     }
 
     private function namedArg(string $name, mixed $value): string
     {
-        return $name . ': ' . $this->export($value);
+        return $name.': '.$this->export($value);
     }
 
     private function export(mixed $v): string
     {
         if (is_string($v)) {
-            return "'" . str_replace(["\\", "'"], ["\\\\", "\\'"], $v) . "'";
+            return "'".str_replace(['\\', "'"], ['\\\\', "\\'"], $v)."'";
         }
         if (is_bool($v)) {
             return $v ? 'true' : 'false';
@@ -214,19 +217,24 @@ final class DumpWorkflowPhpCommand
             $parts = [];
             foreach ($v as $k => $vv) {
                 $piece = $this->export($vv);
-                $parts[] = $isList ? $piece : $this->exportArrayKey($k) . ' => ' . $piece;
+                $parts[] = $isList ? $piece : $this->exportArrayKey($k).' => '.$piece;
             }
-            return '[' . implode(', ', $parts) . ']';
+
+            return '['.implode(', ', $parts).']';
         }
-        if (is_int($v) || is_float($v) || $v === null) {
+        if (is_int($v) || is_float($v) || null === $v) {
             return var_export($v, true);
         }
+
         return var_export($v, true);
     }
 
     private function exportArrayKey(string|int $k): string|int
     {
-        if (is_int($k)) return $k;
-        return "'" . str_replace(["\\", "'"], ["\\\\", "\\'"], (string) $k) . "'";
+        if (is_int($k)) {
+            return $k;
+        }
+
+        return "'".str_replace(['\\', "'"], ['\\\\', "\\'"], (string) $k)."'";
     }
 }

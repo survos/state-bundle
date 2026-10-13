@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Service;
@@ -12,8 +13,9 @@ final class PrimaryKeyLocator
     private array $fieldCache = [];
 
     public function __construct(
-        private readonly EntityManagerInterface $em
-    ) {}
+        private readonly EntityManagerInterface $em,
+    ) {
+    }
 
     /**
      * Return the single PK field name for the entity class, or null for composite/none.
@@ -26,10 +28,12 @@ final class PrimaryKeyLocator
         try {
             $meta = $this->em->getClassMetadata($fqcn);
             $ids = $meta->getIdentifierFieldNames();
-            $this->fieldCache[$fqcn] = (\count($ids) === 1) ? $ids[0] : null;
+            $this->fieldCache[$fqcn] = (1 === \count($ids)) ? $ids[0] : null;
+
             return $this->fieldCache[$fqcn];
         } catch (\Throwable) {
             $this->fieldCache[$fqcn] = null;
+
             return null;
         }
     }
@@ -46,8 +50,8 @@ final class PrimaryKeyLocator
         try {
             $meta = $this->em->getClassMetadata($fqcn);
             $values = $meta->getIdentifierValues($entity);
-            if (\count($values) === 1) {
-                return (string)\array_values($values)[0];
+            if (1 === \count($values)) {
+                return (string) \array_values($values)[0];
             }
         } catch (\Throwable) {
             // fall through
@@ -56,7 +60,8 @@ final class PrimaryKeyLocator
         // Conventional "id" property as last-resort
         try {
             $val = $pa->getValue($entity, 'id');
-            return $val !== null ? (string)$val : null;
+
+            return null !== $val ? (string) $val : null;
         } catch (\Throwable) {
             return null;
         }

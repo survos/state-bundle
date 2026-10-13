@@ -1,23 +1,25 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\StateBundle\Service;
 
 use Survos\StateBundle\Attribute\Place;
 use Survos\StateBundle\Attribute\Transition;
 use Survos\StateBundle\Attribute\Workflow;
 use Symfony\Config\FrameworkConfig;
+
 class ConfigureFromAttributesService
 {
-    static public function configureFramework(string $workflowClass, FrameworkConfig $framework, array|string $supports)
+    public static function configureFramework(string $workflowClass, FrameworkConfig $framework, array|string $supports)
     {
-
         $framework->ide('myide://open?url=file://%%f&line=%%l');
         $reflectionClass = new \ReflectionClass($workflowClass);
-//        $workflow = $framework->workflows()->workflows($workflowClass);
+        //        $workflow = $framework->workflows()->workflows($workflowClass);
         //
         $classAttributes = $reflectionClass->getAttributes();
         foreach ($classAttributes as $attribute) {
-            if ($attribute->getName() === Workflow::class) {
+            if (Workflow::class === $attribute->getName()) {
                 /** @var Workflow $attributeInstance */
                 $attributeInstance = $attribute->newInstance();
                 if (!$name = $attributeInstance->name) {
@@ -42,12 +44,12 @@ class ConfigureFromAttributesService
             $initial = null; // first place, see below
         }
 
-        $isStateMachine = ($type === 'state_machine');
+        $isStateMachine = ('state_machine' === $type);
         $workflow->markingStore()->property($isStateMachine ? 'marking' : 'currentPlaces');
 
         $workflow->auditTrail()->enabled(false);
         assert($workflow, "Workflow $workflowClass must have a #[Workflow] class attribute");
-//        dd($workflow, __CLASS__);
+        //        dd($workflow, __CLASS__);
 
         $constants = $reflectionClass->getConstants();
         $seen = [];
@@ -61,7 +63,7 @@ class ConfigureFromAttributesService
                         // check for initial, but more common is in the #[Workflow] attribute.
                         if ($instance->initial) {
                             if ($isStateMachine) {
-                                assert(is_null($initial), "state machine $workflowClass has only one initial marking  " . $initial);
+                                assert(is_null($initial), "state machine $workflowClass has only one initial marking  ".$initial);
                                 $initial = $constantValue; // $instance->initial;
                             }
                         }
@@ -80,10 +82,11 @@ class ConfigureFromAttributesService
                         }
                         break;
                     default:
-                        assert(false, "not handled: " . $instance::class);
+                        assert(false, 'not handled: '.$instance::class);
                 }
             }
         }
+
         return;
 
         // shortcut to add all places of a certain pattern, if not already seen
@@ -95,16 +98,16 @@ class ConfigureFromAttributesService
                     $firstPlace = $constantValue;
                 }
 
-//                if (!in_array($name, $seen)) {
-//                    $workflow->place()->name($name);
-//                }
+                //                if (!in_array($name, $seen)) {
+                //                    $workflow->place()->name($name);
+                //                }
             }
         }
         if (is_null($initial)) {
-            $initial = $isStateMachine ? $firstPlace: [$firstPlace];
+            $initial = $isStateMachine ? $firstPlace : [$firstPlace];
         }
-//        if (is_array($initial)) dd($initial, $workflowClass);
+        //        if (is_array($initial)) dd($initial, $workflowClass);
 
-//        $workflow->initialMarking($initial);
+        //        $workflow->initialMarking($initial);
     }
 }

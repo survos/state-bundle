@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Util;
@@ -9,13 +10,14 @@ final class QueueNameUtil
      * Normalize any identifier (workflow or transition) to a dotted slug.
      * - strips trailing "Workflow" / "Flow"
      * - lowercases
-     * - collapses non-alnum to single dots
+     * - collapses non-alnum to single dots.
      */
     public static function normalizeSlug(string $s): string
     {
         $s = preg_replace('/(workflow|flow)$/i', '', $s) ?? $s;
         $s = strtolower($s);
         $s = preg_replace('/[^a-z0-9]+/i', '.', $s) ?? $s;
+
         return trim($s, '.');
     }
 
@@ -25,7 +27,8 @@ final class QueueNameUtil
     public static function normalizePrefix(string $raw): string
     {
         $raw = trim($raw);
-        return $raw !== '' ? rtrim($raw, '.') . '.' : '';
+
+        return '' !== $raw ? rtrim($raw, '.').'.' : '';
     }
 
     /** @return array{0:string,1:string} */

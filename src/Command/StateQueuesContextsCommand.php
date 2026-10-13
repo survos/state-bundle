@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Command;
@@ -11,8 +12,6 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Stamp\StampInterface;
-use ReflectionClass;
-use ReflectionProperty;
 
 /**
  * "Where did all these messages come from?" Counts the pending messages per ContextStamp value
@@ -27,7 +26,8 @@ final class StateQueuesContextsCommand
 {
     public function __construct(
         private readonly Connection $db,
-    ) {}
+    ) {
+    }
 
     public function __invoke(
         SymfonyStyle $io,
@@ -70,15 +70,15 @@ final class StateQueuesContextsCommand
         // Pretty JSON dump of the first Envelope, if requested
         if ($debugBody && isset($rows[0])) {
             $io->section('First pending message (pretty JSON from PHP-serialized Envelope in body)');
-            $env = $this->decodeEnvelopeFromBody((string)$rows[0]['body'], /*allowAllClasses*/ true);
+            $env = $this->decodeEnvelopeFromBody((string) $rows[0]['body'], /* allowAllClasses */ true);
             $out = [
-                'id'       => $rows[0]['id'] ?? null,
-                'queue'    => $rows[0]['queue_name'] ?? null,
+                'id' => $rows[0]['id'] ?? null,
+                'queue' => $rows[0]['queue_name'] ?? null,
                 'envelope' => $env instanceof Envelope ? [
                     'message_class' => get_class($env->getMessage()),
-                    'message'       => $this->normalizeValue($env->getMessage(), 0, 3, 100),
-                    'stamps'        => array_map(
-                        fn(array $arr) => array_map(fn($s) => $this->normalizeValue($s, 0, 2, 50), $arr),
+                    'message' => $this->normalizeValue($env->getMessage(), 0, 3, 100),
+                    'stamps' => array_map(
+                        fn (array $arr) => array_map(fn ($s) => $this->normalizeValue($s, 0, 2, 50), $arr),
                         $this->extractAllStampsMap($env)
                     ),
                 ] : 'unserialize_failed',
@@ -96,12 +96,12 @@ final class StateQueuesContextsCommand
             $queues[$qn] = true;
             $totalsByQueue[$qn] = ($totalsByQueue[$qn] ?? 0) + 1;
 
-            $contextValue = $this->extractContextStampFromBody((string)$row['body']);
-            if ($contextValue !== null) {
+            $contextValue = $this->extractContextStampFromBody((string) $row['body']);
+            if (null !== $contextValue) {
                 $contextsByQueue[$qn][$contextValue] = ($contextsByQueue[$qn][$contextValue] ?? 0) + 1;
             }
 
-            if ($filterValues !== [] && $contextValue !== null && in_array((string)$contextValue, $filterValues, true)) {
+            if ([] !== $filterValues && null !== $contextValue && in_array((string) $contextValue, $filterValues, true)) {
                 $filteredTotalsByQueue[$qn] = ($filteredTotalsByQueue[$qn] ?? 0) + 1;
             }
         }
@@ -112,7 +112,7 @@ final class StateQueuesContextsCommand
 
         // Per-context breakdown
         $io->section('Context breakdown by queue (ContextStamp.value)');
-        if ($contextsByQueue === []) {
+        if ([] === $contextsByQueue) {
             $io->writeln('No ContextStamp found on pending messages.');
         } else {
             foreach ($contextsByQueue as $qn => $ctx) {
@@ -123,9 +123,9 @@ final class StateQueuesContextsCommand
         }
 
         // Filtered totals (if active)
-        if ($filterValues !== []) {
+        if ([] !== $filterValues) {
             $io->section(sprintf('Filtered totals (env %s = %s)', $envName, implode(',', $filterValues)));
-            if ($filteredTotalsByQueue === []) {
+            if ([] === $filteredTotalsByQueue) {
                 $io->writeln('No pending messages match the filter.');
             } else {
                 $this->renderTable($io, ['Queue', 'Filtered Pending'], $filteredTotalsByQueue);
@@ -134,7 +134,7 @@ final class StateQueuesContextsCommand
 
         // Helper commands to consume ONLY the first filter value (defaults to "glam")
         $exampleValue = $filterValues[0] ?? 'glam';
-        if ($queues !== []) {
+        if ([] !== $queues) {
             ksort($queues);
             $io->section(sprintf('How to consume ONLY "%s" per queue (using env %s)', $exampleValue, $envName));
             foreach (array_keys($queues) as $qn) {
@@ -159,7 +159,7 @@ final class StateQueuesContextsCommand
         ksort($assoc);
         $rows = [];
         foreach ($assoc as $k => $v) {
-            $rows[] = [(string)$k, (string)$v];
+            $rows[] = [(string) $k, (string) $v];
         }
         $io->table($headers, $rows);
     }
@@ -170,6 +170,7 @@ final class StateQueuesContextsCommand
         if (!preg_match('/^[A-Za-z0-9_\.]+$/', $identifier)) {
             throw new \InvalidArgumentException("Invalid identifier: {$identifier}");
         }
+
         return $identifier;
     }
 
@@ -187,7 +188,7 @@ final class StateQueuesContextsCommand
 
         // If it's a JSON/quoted string literal, decode or strip once
         $trim = ltrim($serialized);
-        if ($trim !== '' && ($trim[0] === '"' || $trim[0] === "'") && substr($serialized, -1) === $trim[0]) {
+        if ('' !== $trim && ('"' === $trim[0] || "'" === $trim[0]) && substr($serialized, -1) === $trim[0]) {
             $decoded = json_decode($serialized, true);
             if (is_string($decoded)) {
                 $serialized = $decoded;
@@ -210,16 +211,17 @@ final class StateQueuesContextsCommand
      */
     private function extractContextStampFromBody(string $body): string|int|null
     {
-        $env = $this->decodeEnvelopeFromBody($body, /*allowAllClasses*/ false);
+        $env = $this->decodeEnvelopeFromBody($body, /* allowAllClasses */ false);
         if (!$env instanceof Envelope) {
             return null;
         }
         $stamps = $env->all(ContextStamp::class);
-        if ($stamps === []) {
+        if ([] === $stamps) {
             return null;
         }
         /** @var ContextStamp $last */
         $last = end($stamps);
+
         return $last->value;
     }
 
@@ -228,12 +230,13 @@ final class StateQueuesContextsCommand
      */
     private function extractAllStampsMap(Envelope $env): array
     {
-        $rc = new ReflectionClass(Envelope::class);
+        $rc = new \ReflectionClass(Envelope::class);
         $prop = $rc->getProperty('stamps');
         $prop->setAccessible(true);
         /** @var array<class-string, array<int, StampInterface>> $map */
         $map = $prop->getValue($env) ?? [];
         ksort($map);
+
         return $map;
     }
 
@@ -251,26 +254,31 @@ final class StateQueuesContextsCommand
             $out = [];
             $i = 0;
             foreach ($value as $k => $v) {
-                if ($i++ >= $maxItems) { $out['…'] = 'truncated'; break; }
-                $out[$k] = $this->normalizeValue($v, $depth+1, $maxDepth, $maxItems);
+                if ($i++ >= $maxItems) {
+                    $out['…'] = 'truncated';
+                    break;
+                }
+                $out[$k] = $this->normalizeValue($v, $depth + 1, $maxDepth, $maxItems);
             }
+
             return $out;
         }
 
         if (is_object($value)) {
             if ($value instanceof \Stringable) {
-                return (string)$value;
+                return (string) $value;
             }
-            $rc = new ReflectionClass($value);
+            $rc = new \ReflectionClass($value);
             $props = [];
-            foreach ($rc->getProperties(ReflectionProperty::IS_PUBLIC | ReflectionProperty::IS_PROTECTED | ReflectionProperty::IS_PRIVATE) as $p) {
+            foreach ($rc->getProperties(\ReflectionProperty::IS_PUBLIC | \ReflectionProperty::IS_PROTECTED | \ReflectionProperty::IS_PRIVATE) as $p) {
                 $p->setAccessible(true);
                 try {
-                    $props[$p->getName()] = $this->normalizeValue($p->getValue($value), $depth+1, $maxDepth, $maxItems);
+                    $props[$p->getName()] = $this->normalizeValue($p->getValue($value), $depth + 1, $maxDepth, $maxItems);
                 } catch (\Throwable $e) {
                     $props[$p->getName()] = 'unreadable('.$e->getMessage().')';
                 }
             }
+
             return ['_class' => $rc->getName(), '_props' => $props];
         }
 
@@ -281,11 +289,12 @@ final class StateQueuesContextsCommand
     private function readFilterValues(string $envName): array
     {
         $raw = \getenv($envName);
-        if ($raw === false || $raw === '') {
+        if (false === $raw || '' === $raw) {
             return [];
         }
         $parts = array_map('trim', explode(',', $raw));
-        $parts = array_filter($parts, static fn($v) => $v !== '');
+        $parts = array_filter($parts, static fn ($v) => '' !== $v);
+
         return array_map('strval', array_values($parts));
     }
 }

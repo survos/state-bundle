@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Service;
@@ -11,7 +12,6 @@ use Survos\StateBundle\Message\TransitionMessage;
 use Symfony\Component\DependencyInjection\Attribute\AutowireLocator;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
 use Symfony\Component\Workflow\Attribute\AsCompletedListener;
 use Symfony\Component\Workflow\Attribute\AsEnteredListener;
@@ -33,7 +33,8 @@ final class WorkflowListener
         private ManagerRegistry $registry,
         private AsyncQueueLocator $asyncQueueLocator,
         private LoggerInterface $logger = new NullLogger(),
-    ) {}
+    ) {
+    }
 
     #[AsEnteredListener]
     public function onEntered(EnteredEvent $event): void
@@ -42,7 +43,7 @@ final class WorkflowListener
             return;
         }
 
-        $subject  = $event->getSubject();
+        $subject = $event->getSubject();
         $workflow = $this->workflowHelperService->getWorkflow($subject, $event->getWorkflowName());
 
         $currentPlace = array_keys($workflow->getMarking($subject)->getPlaces())[0] ?? null;
@@ -68,8 +69,8 @@ final class WorkflowListener
             return;
         }
 
-        $subject   = $event->getSubject();
-        $workflow  = $this->workflowHelperService->getWorkflow($subject, $event->getWorkflowName());
+        $subject = $event->getSubject();
+        $workflow = $this->workflowHelperService->getWorkflow($subject, $event->getWorkflowName());
         $fromTrans = $event->getTransition();
 
         $next = (array) ($event->getMetadata('next', $fromTrans) ?? []);
@@ -104,6 +105,7 @@ final class WorkflowListener
         // this seems expensive?
         if (!$id = $this->resolveId($subject)) {
             $this->logger->warning('WorkflowListener: cannot resolve id for subject', ['class' => $subject::class]);
+
             return;
         }
         $message = new TransitionMessage(
@@ -119,7 +121,7 @@ final class WorkflowListener
         // never hard-fail when its stamp classes are absent.
         if (class_exists(DescriptionStamp::class)) {
             $short = (new \ReflectionClass($subject))->getShortName();
-            $stamps[] = new DescriptionStamp(sprintf('Next/%s-%s @%s: %s', $short, (string)$id, (string)$atPlace, $transition));
+            $stamps[] = new DescriptionStamp(sprintf('Next/%s-%s @%s: %s', $short, (string) $id, (string) $atPlace, $transition));
         }
         if (class_exists(TagStamp::class)) {
             $stamps[] = new TagStamp($transition);
@@ -140,13 +142,14 @@ final class WorkflowListener
         $em = $this->registry->getManagerForClass($entity::class) ?? $this->entityManager;
         try {
             $meta = $em->getClassMetadata($entity::class);
-            $ids  = $meta->getIdentifierValues($entity);
+            $ids = $meta->getIdentifierValues($entity);
             if (!$ids) {
                 return null;
             }
-            if (\count($ids) === 1) {
+            if (1 === \count($ids)) {
                 return (string) \array_values($ids)[0];
             }
+
             return json_encode($ids, JSON_UNESCAPED_SLASHES) ?: null;
         } catch (\Throwable) {
             return null;

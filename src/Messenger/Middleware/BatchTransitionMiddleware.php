@@ -41,10 +41,10 @@ final class BatchTransitionMiddleware implements MiddlewareInterface
         $msg = $envelope->getMessage();
         if ($this->batchEnabled
             && $msg instanceof TransitionMessage
-            && $envelope->last(ReceivedStamp::class) === null
-            && $envelope->last(HandledStamp::class) === null
+            && null === $envelope->last(ReceivedStamp::class)
+            && null === $envelope->last(HandledStamp::class)
             && empty($msg->getContext()[BatchedTransitionMessage::CONTEXT_UNBATCHED])
-            && $this->locator->batchSize((string) $msg->getWorkflow(), $msg->getTransitionName()) !== null) {
+            && null !== $this->locator->batchSize((string) $msg->getWorkflow(), $msg->getTransitionName())) {
             $envelope = new Envelope(BatchedTransitionMessage::fromTransitionMessage($msg), array_merge([], ...array_values($envelope->all())));
         }
 

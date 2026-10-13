@@ -13,7 +13,7 @@ final class AttributesWorkflowConfigBuilderTest extends TestCase
 {
     public function testBuildPublishesWorkflowDefinitionMappings(): void
     {
-        $built = AttributesWorkflowConfigBuilder::build([__DIR__ . '/Fixtures/Workflow']);
+        $built = AttributesWorkflowConfigBuilder::build([__DIR__.'/Fixtures/Workflow']);
 
         $this->assertArrayHasKey('test_asset', $built['workflows']);
         $transition = $built['workflows']['test_asset']['transitions'][0];

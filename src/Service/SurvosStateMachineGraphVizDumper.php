@@ -1,13 +1,12 @@
 <?php
-declare(strict_types=1);
 
+declare(strict_types=1);
 
 namespace Survos\StateBundle\Service;
 
 use Symfony\Component\Workflow\Definition;
 use Symfony\Component\Workflow\Dumper\DumperInterface;
 use Symfony\Component\Workflow\Dumper\GraphvizDumper;
-use Symfony\Component\Workflow\Dumper\StateMachineGraphvizDumper;
 use Symfony\Component\Workflow\Marking;
 
 /**
@@ -48,9 +47,9 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
         $options = array_replace_recursive(self::$defaultOptions, $options);
 
         return $this->startDot($options)
-            . $this->addPlaces($places)
-            . $this->addEdges($edges)
-            . $this->endDot()
+            .$this->addPlaces($places)
+            .$this->addEdges($edges)
+            .$this->endDot()
         ;
     }
 
@@ -148,7 +147,7 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
             $attributes = [];
 
             $transitionName = $workflowMetadata->getMetadata('label', $transition) ?? ucwords(str_replace('_', ' ', $transition->getName()));
-            $async = $workflowMetadata->getMetadata('async', $transition) === true;
+            $async = true === $workflowMetadata->getMetadata('async', $transition);
 
             $labelColor = $workflowMetadata->getMetadata('color', $transition);
             if (null !== $labelColor) {
@@ -165,10 +164,9 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
                 $attributes['tooltip'] .= ' — Async: queued for a worker';
             }
             $guard = $workflowMetadata->getMetadata('guard', $transition);
-            if (is_string($guard) && $guard !== '') {
+            if (is_string($guard) && '' !== $guard) {
                 $attributes['tooltip'] .= ' — Guard: '.$this->normalizeTooltip($guard);
             }
-
 
             $path = 0;
             foreach ($transition->getFroms() as $from) {
@@ -214,44 +212,44 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
         return $code;
     }
 
-protected function addPlaces(array $places): string
-{
-    $code = '';
+    protected function addPlaces(array $places): string
+    {
+        $code = '';
 
-    foreach ($places as $id => $place) {
-        if (isset($place['attributes']['name'])) {
-            $placeName = $place['attributes']['name'];
-            unset($place['attributes']['name']);
-        } else {
-            $placeName = ucwords(str_replace('_', ' ', $id));
+        foreach ($places as $id => $place) {
+            if (isset($place['attributes']['name'])) {
+                $placeName = $place['attributes']['name'];
+                unset($place['attributes']['name']);
+            } else {
+                $placeName = ucwords(str_replace('_', ' ', $id));
+            }
+
+            if (isset($place['attributes']['shape'])) {
+                $shape = $place['attributes']['shape'];
+                unset($place['attributes']['shape']);
+            } else {
+                $shape = 'ellipse';
+            }
+            assert(!empty($shape), json_encode($place));
+
+            $code .= sprintf(
+                "  place_%s [label=\"%s\", shape=%s%s];\n",
+                $this->dotize($id),
+                $this->escape($placeName),
+                $shape,
+                $this->addAttributes($place['attributes'])
+            );
         }
+        //    dd($code);
 
-        if (isset($place['attributes']['shape'])) {
-            $shape = $place['attributes']['shape'];
-            unset($place['attributes']['shape']);
-        } else {
-            $shape = 'ellipse';
-        }
-        assert(! empty($shape), json_encode($place));
-
-        $code .= sprintf(
-            "  place_%s [label=\"%s\", shape=%s%s];\n",
-            $this->dotize($id),
-            $this->escape($placeName),
-            $shape,
-            $this->addAttributes($place['attributes'])
-        );
+        return $code;
     }
-    //    dd($code);
-
-    return $code;
-}
 
     private function edgeLabel(string $name, string $guard, ?string $guardLabel = null, bool $async = false): string
     {
         $html = static fn (string $text): string => htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $title = $async ? '◷ <I>'.$html($name).'</I>' : $html($name);
-        if ($guard === '') {
+        if ('' === $guard) {
             return $async ? '<'.$title.'>' : '"'.$this->escape($name).'"';
         }
 
@@ -261,7 +259,7 @@ protected function addPlaces(array $places): string
 REGEX;
         $parts = preg_split($quotedStrings, $guard, -1, PREG_SPLIT_DELIM_CAPTURE);
         foreach ($parts as $index => &$part) {
-            if ($index % 2 === 1) {
+            if (1 === $index % 2) {
                 continue;
             }
             $part = preg_replace('/\bsubject\./', '', $part);
@@ -273,9 +271,10 @@ REGEX;
             $part = preg_replace('/\s*(&&|\|\|)\s*/', "\n$1 ", $part);
         }
         unset($part);
-        $compact = ($guardLabel !== null && trim($guardLabel) !== ''
+        $compact = (null !== $guardLabel && '' !== trim($guardLabel)
             ? wordwrap(trim($guardLabel), 32, "\n")
             : trim(implode('', $parts)));
+
         return '<'.$title.'<BR/><FONT POINT-SIZE="9" COLOR="#64748b"><I>'
             .str_replace("\n", '<BR ALIGN="LEFT"/>', $html($compact)).'</I></FONT>>';
     }
@@ -303,5 +302,4 @@ REGEX;
 
         return $code ? ' '.implode(' ', $code) : '';
     }
-
 }

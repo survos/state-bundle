@@ -1,24 +1,22 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Config;
 
-use ReflectionClass;
-use ReflectionClassConstant;
-use Symfony\Component\Config\Resource\FileResource;
-use Symfony\Component\Finder\Finder;
-
-// Attribute classes (current)
-use Survos\StateBundle\Attribute\Workflow as WFAttr;
 use Survos\StateBundle\Attribute\Place as PlaceAttr;
 use Survos\StateBundle\Attribute\Transition as TransAttr;
+// Attribute classes (current)
+use Survos\StateBundle\Attribute\Workflow as WFAttr;
+use Symfony\Component\Config\Resource\FileResource;
+use Symfony\Component\Finder\Finder;
 
 /**
  * Scans workflow definition files (classes/interfaces/traits with attributes) and
  * builds a framework.workflows config payload. Ensures:
  *  - Place metadata is attached PER PLACE (so Symfony's MetadataStore populates placesMetadata)
  *  - Transition guard stays at top-level for execution and in metadata for documentation
- *  - Async transitions are tracked for external wiring (Messenger, etc.)
+ *  - Async transitions are tracked for external wiring (Messenger, etc.).
  *
  * Returns:
  *  [
@@ -31,6 +29,7 @@ final class AttributesWorkflowConfigBuilder
 {
     /**
      * @param string[] $workflowDirs
+     *
      * @return array{
      *   workflows: array,
      *   async_transitions: string[],
@@ -73,7 +72,7 @@ final class AttributesWorkflowConfigBuilder
             if (!preg_match('/\b(class|interface|trait)\s+([A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*)/m', $code, $ci)) {
                 continue;
             }
-            $fqcn = trim($ns[1]) . '\\' . trim($ci[2]);
+            $fqcn = trim($ns[1]).'\\'.trim($ci[2]);
 
             if (!class_exists($fqcn) && !interface_exists($fqcn) && !trait_exists($fqcn)) {
                 try {
@@ -86,7 +85,7 @@ final class AttributesWorkflowConfigBuilder
                 continue;
             }
 
-            $rc = new ReflectionClass($fqcn);
+            $rc = new \ReflectionClass($fqcn);
 
             // Support both current and (optionally) legacy Workflow attributes if present.
             $wfAttr = self::findFirstAttributeInstance($rc, self::workflowAttrCandidates());
@@ -96,10 +95,10 @@ final class AttributesWorkflowConfigBuilder
             }
 
             // Basic workflow wiring
-            $wfName   = property_exists($wfAttr, 'name') && $wfAttr->name ? $wfAttr->name : $rc->getShortName();
-            $wfType   = property_exists($wfAttr, 'type') && $wfAttr->type ? $wfAttr->type : 'state_machine';
+            $wfName = property_exists($wfAttr, 'name') && $wfAttr->name ? $wfAttr->name : $rc->getShortName();
+            $wfType = property_exists($wfAttr, 'type') && $wfAttr->type ? $wfAttr->type : 'state_machine';
             $supports = property_exists($wfAttr, 'supports') && is_array($wfAttr->supports) ? $wfAttr->supports : [];
-            $initial  = property_exists($wfAttr, 'initial') ? $wfAttr->initial : null;
+            $initial = property_exists($wfAttr, 'initial') ? $wfAttr->initial : null;
 
             $definitionClassesByWorkflow[$wfName] = $fqcn;
             foreach ($supports as $supportedClass) {
@@ -114,7 +113,7 @@ final class AttributesWorkflowConfigBuilder
             $placesAssoc = [];
             $transitions = [];
 
-            /** @var ReflectionClassConstant $const */
+            /** @var \ReflectionClassConstant $const */
             foreach ($rc->getReflectionConstants() as $const) {
                 if (is_array($const->getValue())) {
                     continue; // e.g. PLACES
@@ -137,9 +136,9 @@ final class AttributesWorkflowConfigBuilder
                     $placesAssoc[$value] = $pm ? ['metadata' => $pm] : [];
 
                     // Initial for state_machine
-                    if (method_exists($p, 'getIsInitial') && $p->getIsInitial() && $wfType === 'state_machine' && null === $initial) {
+                    if (method_exists($p, 'getIsInitial') && $p->getIsInitial() && 'state_machine' === $wfType && null === $initial) {
                         $initial = $value;
-                    } elseif (property_exists($p, 'initial') && $p->initial && $wfType === 'state_machine' && null === $initial) {
+                    } elseif (property_exists($p, 'initial') && $p->initial && 'state_machine' === $wfType && null === $initial) {
                         $initial = $value;
                     }
                 }
@@ -151,7 +150,7 @@ final class AttributesWorkflowConfigBuilder
                     $item = [
                         'name' => $name,
                         'from' => (array) (property_exists($t, 'from') ? $t->from : []),
-                        'to'   => (array) (property_exists($t, 'to') ? (is_array($t->to) ? $t->to : [$t->to]) : []),
+                        'to' => (array) (property_exists($t, 'to') ? (is_array($t->to) ? $t->to : [$t->to]) : []),
                     ];
 
                     // Guard must be top-level for ExpressionLanguage guard to work
@@ -198,19 +197,19 @@ final class AttributesWorkflowConfigBuilder
 
             // Build node
             $node = [
-                'type'        => $wfType,
-                'supports'    => $supports ?: [$fqcn],
+                'type' => $wfType,
+                'supports' => $supports ?: [$fqcn],
                 // IMPORTANT: associative places so Symfony populates placesMetadata
-                'places'      => $placesAssoc,
+                'places' => $placesAssoc,
                 'transitions' => $transitions,
                 'marking_store' => [
-                    'type'     => 'method',
+                    'type' => 'method',
                     'property' => 'marking', // single-state marking for state_machine
                 ],
             ];
 
             if (null !== $initial) {
-                $node['initial_marking'] = $wfType === 'state_machine' ? $initial : (array) $initial;
+                $node['initial_marking'] = 'state_machine' === $wfType ? $initial : (array) $initial;
             }
 
             // NOTE: We deliberately do NOT stuff per-place data under workflow-level metadata['places'].
@@ -221,9 +220,9 @@ final class AttributesWorkflowConfigBuilder
         }
 
         return [
-            'workflows'         => $workflows,
+            'workflows' => $workflows,
             'async_transitions' => array_values(array_unique($asyncTransitions)),
-            'resources'         => $resources,
+            'resources' => $resources,
             'definition_classes' => [
                 'by_workflow' => $definitionClassesByWorkflow,
                 'by_support' => $definitionClassesBySupport,
@@ -246,6 +245,7 @@ final class AttributesWorkflowConfigBuilder
                 return $attrs[0]->newInstance();
             }
         }
+
         return null;
     }
 
@@ -262,6 +262,7 @@ final class AttributesWorkflowConfigBuilder
         if (class_exists('Survos\\StateBundle\\Attribute\\OldWorkflow')) {
             $candidates[] = 'Survos\\StateBundle\\Attribute\\OldWorkflow';
         }
+
         return $candidates;
     }
 
@@ -276,6 +277,7 @@ final class AttributesWorkflowConfigBuilder
         if (class_exists('Survos\\StateBundle\\Attribute\\OldPlace')) {
             $candidates[] = 'Survos\\StateBundle\\Attribute\\OldPlace';
         }
+
         return $candidates;
     }
 
@@ -290,6 +292,7 @@ final class AttributesWorkflowConfigBuilder
         if (class_exists('Survos\\StateBundle\\Attribute\\OldTransition')) {
             $candidates[] = 'Survos\\StateBundle\\Attribute\\OldTransition';
         }
+
         return $candidates;
     }
 }

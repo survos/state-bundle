@@ -1,16 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\StateBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Mapping\ClassMetadataInfo;
-use Survos\StateBundle\Traits\MarkingInterface;
 
 class EntityInterfaceDetector
 {
     public function __construct(
-        private EntityManagerInterface $em
-    ) {}
+        private EntityManagerInterface $em,
+    ) {
+    }
 
     public function getEntitiesImplementing(string $interface): array
     {

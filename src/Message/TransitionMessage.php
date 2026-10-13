@@ -1,15 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\StateBundle\Message;
 
 class TransitionMessage
 {
     public function __construct(
-        private(set) int|string $id,
-        private(set) string $className,
-        private(set) string $transitionName,
-        private(set) string $workflow,
-        public array $context=[], // to pass around tags and other extra properties
+        public private(set) int|string $id,
+        public private(set) string $className,
+        public private(set) string $transitionName,
+        public private(set) string $workflow,
+        public array $context = [], // to pass around tags and other extra properties
     ) {
     }
 

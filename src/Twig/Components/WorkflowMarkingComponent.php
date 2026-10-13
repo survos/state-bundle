@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Survos\StateBundle\Twig\Components;
 
 use Doctrine\Persistence\ManagerRegistry;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Survos\StateBundle\Service\AsyncQueueLocator;
 use Survos\StateBundle\Traits\MarkingInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Workflow\Registry;
 use Symfony\Component\Workflow\TransitionBlocker;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
@@ -85,7 +85,7 @@ final class WorkflowMarkingComponent
      */
     public function getResolvedGlobalKey(): string
     {
-        if (is_string($this->globalKey) && $this->globalKey !== '') {
+        if (is_string($this->globalKey) && '' !== $this->globalKey) {
             return $this->globalKey;
         }
 
@@ -121,18 +121,14 @@ final class WorkflowMarkingComponent
     public function getEntityId(): int|string
     {
         $class = $this->subject::class;
-        $em    = $this->managerRegistry->getManagerForClass($class);
-        if ($em === null) {
+        $em = $this->managerRegistry->getManagerForClass($class);
+        if (null === $em) {
             throw new \LogicException(sprintf('%s is not managed by any entity manager.', $class));
         }
 
         $ids = $em->getClassMetadata($class)->getIdentifierValues($this->subject);
-        if (count($ids) !== 1) {
-            throw new \LogicException(sprintf(
-                '%s has a composite identifier (%s); the transition apply route addresses entities by a single id.',
-                $class,
-                implode(', ', array_keys($ids)) ?: 'none',
-            ));
+        if (1 !== count($ids)) {
+            throw new \LogicException(sprintf('%s has a composite identifier (%s); the transition apply route addresses entities by a single id.', $class, implode(', ', array_keys($ids)) ?: 'none'));
         }
 
         return reset($ids);
@@ -146,9 +142,10 @@ final class WorkflowMarkingComponent
     public function getPlaceMeta(): array
     {
         $marking = $this->subject->getMarking();
-        if ($marking === null) {
+        if (null === $marking) {
             return [];
         }
+
         return $this->workflowRegistry->get($this->subject)
             ->getMetadataStore()
             ->getPlaceMetadata($marking);
@@ -169,7 +166,7 @@ final class WorkflowMarkingComponent
     public function getTransitions(): array
     {
         $workflow = $this->workflowRegistry->get($this->subject);
-        $store    = $workflow->getDefinition()->getMetadataStore();
+        $store = $workflow->getDefinition()->getMetadataStore();
         $flowName = $workflow->getName();
 
         $enabledMap = [];
@@ -187,7 +184,7 @@ final class WorkflowMarkingComponent
             }
         }
 
-        $seen        = [];
+        $seen = [];
         $transitions = [];
         foreach ($workflow->getDefinition()->getTransitions() as $transition) {
             $name = $transition->getName();
@@ -196,7 +193,7 @@ final class WorkflowMarkingComponent
             }
             $seen[$name] = true;
 
-            $meta    = $store->getTransitionMetadata($transition);
+            $meta = $store->getTransitionMetadata($transition);
             $enabled = isset($enabledMap[$name]);
 
             $blockers = [];
@@ -209,23 +206,23 @@ final class WorkflowMarkingComponent
                     // the transition") restates the fact you can already see -- the button
                     // is dimmed. Naming the places it IS available from answers the question
                     // actually being asked, which is what has to happen first.
-                    $blockers[] = $blocker->getCode() === TransitionBlocker::BLOCKED_BY_MARKING
+                    $blockers[] = TransitionBlocker::BLOCKED_BY_MARKING === $blocker->getCode()
                         ? sprintf('Available from: %s', implode(', ', $fromsByName[$name] ?? []))
                         : $blocker->getMessage();
                 }
             }
 
             $transitions[] = [
-                'name'        => $name,
-                'label'       => is_string($meta['label'] ?? null) ? $meta['label'] : self::humanize($name),
+                'name' => $name,
+                'label' => is_string($meta['label'] ?? null) ? $meta['label'] : self::humanize($name),
                 'description' => $meta['description'] ?? null,
-                'guard'       => $meta['guard'] ?? null,
-                'enabled'     => $enabled,
+                'guard' => $meta['guard'] ?? null,
+                'enabled' => $enabled,
                 // Asked of the locator rather than read off the metadata: the locator is
                 // what actually decides routing at dispatch time (it also honours the
                 // global sync override), so this is the same answer the bus will give.
-                'async'       => $this->asyncQueueLocator->isAsync($flowName, $name),
-                'blockers'    => $blockers,
+                'async' => $this->asyncQueueLocator->isAsync($flowName, $name),
+                'blockers' => $blockers,
             ];
         }
 
@@ -257,31 +254,31 @@ final class WorkflowMarkingComponent
     public function getPlaces(): array
     {
         $definition = $this->workflowRegistry->get($this->subject)->getDefinition();
-        $store      = $definition->getMetadataStore();
-        $marking    = $this->subject->getMarking();
+        $store = $definition->getMetadataStore();
+        $marking = $this->subject->getMarking();
 
         $edges = [];
         foreach ($definition->getTransitions() as $transition) {
             foreach ($transition->getFroms() as $from) {
                 foreach ($transition->getTos() as $to) {
-                    $edges[$from . "\0" . $to] = true;
+                    $edges[$from."\0".$to] = true;
                 }
             }
         }
 
         $places = array_values($definition->getPlaces());
-        $rows   = [];
+        $rows = [];
         foreach ($places as $i => $place) {
             $meta = $store->getPlaceMetadata($place);
             $next = $places[$i + 1] ?? null;
 
             $rows[] = [
-                'name'        => $place,
-                'label'       => is_string($meta['label'] ?? null) ? $meta['label'] : $place,
-                'info'        => $meta['info'] ?? $meta['description'] ?? null,
-                'bgColor'     => is_string($meta['bgColor'] ?? null) ? $meta['bgColor'] : 'secondary',
-                'current'     => $place === $marking,
-                'flowsToNext' => $next !== null && isset($edges[$place . "\0" . $next]),
+                'name' => $place,
+                'label' => is_string($meta['label'] ?? null) ? $meta['label'] : $place,
+                'info' => $meta['info'] ?? $meta['description'] ?? null,
+                'bgColor' => is_string($meta['bgColor'] ?? null) ? $meta['bgColor'] : 'secondary',
+                'current' => $place === $marking,
+                'flowsToNext' => null !== $next && isset($edges[$place."\0".$next]),
             ];
         }
 

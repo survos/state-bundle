@@ -31,19 +31,38 @@ final class BatchedTransitionMessage
     public const string CONTEXT_UNBATCHED = 'unbatched';
 
     public function __construct(
-        private(set) int|string $id,
-        private(set) string $className,
-        private(set) string $transitionName,
-        private(set) string $workflow,
+        public private(set) int|string $id,
+        public private(set) string $className,
+        public private(set) string $transitionName,
+        public private(set) string $workflow,
         public array $context = [],
     ) {
     }
 
-    public function getId(): int|string { return $this->id; }
-    public function getClassName(): string { return $this->className; }
-    public function getTransitionName(): string { return $this->transitionName; }
-    public function getWorkflow(): string { return $this->workflow; }
-    public function getContext(): array { return $this->context; }
+    public function getId(): int|string
+    {
+        return $this->id;
+    }
+
+    public function getClassName(): string
+    {
+        return $this->className;
+    }
+
+    public function getTransitionName(): string
+    {
+        return $this->transitionName;
+    }
+
+    public function getWorkflow(): string
+    {
+        return $this->workflow;
+    }
+
+    public function getContext(): array
+    {
+        return $this->context;
+    }
 
     public static function fromTransitionMessage(TransitionMessage $message): self
     {
@@ -58,6 +77,6 @@ final class BatchedTransitionMessage
     /** Messages that belong in the same batch: same class, workflow and transition. */
     public function groupKey(): string
     {
-        return $this->className . '|' . $this->workflow . '|' . $this->transitionName;
+        return $this->className.'|'.$this->workflow.'|'.$this->transitionName;
     }
 }

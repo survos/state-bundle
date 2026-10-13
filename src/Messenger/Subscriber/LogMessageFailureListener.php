@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Messenger\Subscriber;
@@ -12,18 +13,20 @@ use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 #[AsEventListener(event: WorkerMessageFailedEvent::class, priority: 0)]
 final class LogMessageFailureListener
 {
-    public function __construct(private readonly LoggerInterface $logger) {}
+    public function __construct(private readonly LoggerInterface $logger)
+    {
+    }
 
     public function __invoke(WorkerMessageFailedEvent $event): void
     {
         $envelope = $event->getEnvelope();
-        $e        = $event->getThrowable();
+        $e = $event->getThrowable();
 
-        $msg      = $envelope->getMessage();
+        $msg = $envelope->getMessage();
         $msgClass = is_object($msg) ? get_class($msg) : get_debug_type($msg);
 
         $transport = $envelope->last(TransportNamesStamp::class)?->getTransportNames()[0] ?? 'unknown';
-        $context   = $envelope->last(ContextStamp::class);
+        $context = $envelope->last(ContextStamp::class);
         $contextStr = $context ? sprintf('%s=%s', $context->key, $context->value) : 'n/a';
 
         // concise headline

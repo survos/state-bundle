@@ -20,7 +20,7 @@ final class WorkflowExtensionTest extends TestCase
     public function testWorkflowTwigFunctionsIncludeConstantResolvers(): void
     {
         $extension = new WorkflowExtension($this->createWorkflowHelperService());
-        $names = array_map(fn($function) => $function->getName(), $extension->getFunctions());
+        $names = array_map(fn ($function) => $function->getName(), $extension->getFunctions());
 
         $this->assertContains('workflow_const', $names);
         $this->assertContains('workflow_name', $names);

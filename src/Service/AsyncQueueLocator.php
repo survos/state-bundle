@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Survos\StateBundle\Service;
@@ -10,15 +11,14 @@ use Survos\StateBundle\Messenger\Stamp\ContextStamp;
 use Survos\StateBundle\Util\QueueNameUtil;
 use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 use Zenstruck\Messenger\Monitor\Stamp\DescriptionStamp;
-use Zenstruck\Messenger\Monitor\Stamp\TagStamp;
 
 final class AsyncQueueLocator
 {
     public bool $sync = false;
-    public ?string $transport=null; // force override
+    public ?string $transport = null; // force override
 
     /**
-     * @param array<string, array<string, string>> $map  e.g. ['media' => ['download' => 'media.download']]
+     * @param array<string, array<string, string>> $map e.g. ['media' => ['download' => 'media.download']]
      */
     /**
      * @param array<string, array<string, int>> $batchMap e.g. ['asset' => ['ai_task' => 500]]
@@ -28,7 +28,8 @@ final class AsyncQueueLocator
         private readonly array $placeTransitions,
         private readonly EntityManagerInterface $entityManager,
         private readonly array $batchMap = [],
-    ) {}
+    ) {
+    }
 
     /** Batch size for a #[Transition(batch: N)] transition, or null when it is handled one by one. */
     public function batchSize(string $workflow, string $transition): ?int
@@ -36,7 +37,7 @@ final class AsyncQueueLocator
         [$wf, $tr] = QueueNameUtil::normalizePair($workflow, $transition);
         $size = $this->batchMap[$wf][$tr] ?? $this->batchMap[$workflow][$transition] ?? null;
 
-        return $size !== null && $size > 0 ? (int) $size : null;
+        return null !== $size && $size > 0 ? (int) $size : null;
     }
 
     // --- Primary (workflow-aware) API ---------------------------------------
@@ -45,12 +46,14 @@ final class AsyncQueueLocator
     {
         return $this->placeTransitions[$workflow][$placename] ?? [];
     }
+
     public function isAsync(string $workflow, string $transition): bool
     {
         if ($this->sync) {
             return false;
         }
         [$wf, $tr] = QueueNameUtil::normalizePair($workflow, $transition);
+
         return isset($this->map[$wf][$tr]);
     }
 
@@ -63,11 +66,12 @@ final class AsyncQueueLocator
             return $this->transport;
         }
         [$wf, $tr] = QueueNameUtil::normalizePair($workflow, $transition);
+
         return $this->map[$wf][$tr] ?? null;
     }
 
     /** @return TransportNamesStamp[] */
-    public function stampsFor(string $workflow, string $transition, ?string $id=null): array
+    public function stampsFor(string $workflow, string $transition, ?string $id = null): array
     {
         throw new \LogicException('use ->stamps(msg)');
     }
@@ -78,29 +82,30 @@ final class AsyncQueueLocator
             $stamps = [new TransportNamesStamp(['sync'])];
         } else {
             $q = $this->queueFor($message->workflow, $message->transitionName);
-            $stamps =  $q ? [new TransportNamesStamp([$q])] : [];
+            $stamps = $q ? [new TransportNamesStamp([$q])] : [];
         }
 
-//        if (class_exists(DescriptionStamp::class)) {
-//            $stamps[] = new DescriptionStamp($message->transitionName);
-//        }
-//        if ($message->id && class_exists(DescriptionStamp::class)) {
-//            $shortClass = new \ReflectionClass($message->className);
-//            $stamps[] = new DescriptionStamp("{$shortClass}:{$message->id} {$message->transitionName}");
-//        }
+        //        if (class_exists(DescriptionStamp::class)) {
+        //            $stamps[] = new DescriptionStamp($message->transitionName);
+        //        }
+        //        if ($message->id && class_exists(DescriptionStamp::class)) {
+        //            $shortClass = new \ReflectionClass($message->className);
+        //            $stamps[] = new DescriptionStamp("{$shortClass}:{$message->id} {$message->transitionName}");
+        //        }
 
-        if (is_a($className=$message->className, ContextStampProviderInterface::class, true)) {
+        if (is_a($className = $message->className, ContextStampProviderInterface::class, true)) {
             if ($entity = $this->entityManager->find($className, $message->id)) {
                 $contextStamp = $entity->getContextStamp();
             }
             if (is_array($contextStamp)) {
                 foreach ($contextStamp as $key => $val) {
-                    $stamps[] = new ContextStamp($val, (string)$key);
+                    $stamps[] = new ContextStamp($val, (string) $key);
                 }
             } else {
                 $stamps[] = new ContextStamp($contextStamp);
             }
         }
+
         return $stamps;
     }
 
@@ -117,8 +122,10 @@ final class AsyncQueueLocator
     {
         if (str_contains($route, '.')) {
             [$wf, $tr] = explode('.', $route, 2);
+
             return $this->queueFor($wf, $tr);
         }
+
         // Fallback: treat as transition-only (if unique)
         return $this->queueForTransitionOnly($route);
     }
@@ -130,13 +137,14 @@ final class AsyncQueueLocator
         $found = null;
         foreach ($this->map as $trs) {
             if (isset($trs[$tr])) {
-                if ($found !== null) {
+                if (null !== $found) {
                     // ambiguous across workflows
                     return null;
                 }
                 $found = $trs[$tr];
             }
         }
+
         return $found;
     }
 }

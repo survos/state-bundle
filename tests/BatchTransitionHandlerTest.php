@@ -140,6 +140,7 @@ final class BatchTransitionHandlerTest extends TestCase
         });
         $bus = new class implements MessageBusInterface {
             public array $sent = [];
+
             public function dispatch(object $message, array $stamps = []): Envelope
             {
                 $this->sent[] = $message;
