@@ -144,7 +144,7 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
 
         $edges = [];
 
-        foreach ($definition->getTransitions() as $transition) {
+        foreach ($definition->getTransitions() as $index => $transition) {
             $attributes = [];
 
             $transitionName = $workflowMetadata->getMetadata('label', $transition) ?? ucwords(str_replace('_', ' ', $transition->getName()));
@@ -170,8 +170,11 @@ class SurvosStateMachineGraphVizDumper implements DumperInterface
             }
 
 
+            $path = 0;
             foreach ($transition->getFroms() as $from) {
                 foreach ($transition->getTos() as $to) {
+                    // The SVG id lets the explorer map an edge back to its transition (names may repeat).
+                    $attributes['id'] = sprintf('wf-transition-%d-%d', $index, $path++);
                     $edge = [
                         'name' => $transitionName,
                         'async' => $async,

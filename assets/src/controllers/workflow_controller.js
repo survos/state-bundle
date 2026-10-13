@@ -3,7 +3,7 @@ import { Controller } from '@hotwired/stimulus';
 /* stimulusFetch: 'lazy' */
 export default class extends Controller {
     static targets = ['graph', 'place', 'status', 'search', 'empty'];
-    static values = { digraph: String };
+    static values = { digraph: String, details: Object };
 
     async connect() {
         const run = this.run = {};
@@ -33,18 +33,6 @@ export default class extends Controller {
                     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
                 }
                 this.prepareGraph(target);
-                // Promote Graphviz link tooltips to native SVG titles.
-                target.querySelectorAll('g.node, g.edge').forEach(group => {
-                    const link = group.querySelector('a');
-                    const tip = link?.getAttributeNS('http://www.w3.org/1999/xlink', 'title');
-                    if (!tip) return;
-                    let title = group.querySelector(':scope > title');
-                    if (!title) {
-                        title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-                        group.prepend(title);
-                    }
-                    title.textContent = tip;
-                });
             });
         } catch (error) {
             fail(error);
@@ -80,7 +68,9 @@ export default class extends Controller {
             const endpoints = edge.querySelector(':scope > title')?.textContent.split('->') ?? [];
             edge.dataset.from = endpoints[0]?.replace(/^place_/, '') ?? '';
             edge.dataset.to = endpoints[1]?.replace(/^place_/, '') ?? '';
+            edge.dataset.transition = edge.id.match(/^wf-transition-(\d+)-/)?.[1] ?? '';
         });
+        this.prepareHovercard(target, options);
         target.addEventListener('pointerdown', event => {
             if (event.button !== 0) return;
             this.dragged = false;
@@ -92,6 +82,7 @@ export default class extends Controller {
             const dy = event.clientY - this.drag.y;
             if (Math.hypot(dx, dy) < 4 && !this.dragged) return;
             this.dragged = true;
+            this.hideHovercard();
             target.setPointerCapture(event.pointerId);
             const rect = this.svg.getBoundingClientRect();
             const scale = Math.max(this.viewBox[2] / rect.width, this.viewBox[3] / rect.height);
@@ -104,6 +95,91 @@ export default class extends Controller {
         }
         target.addEventListener('wheel', event => this.wheelZoom(event), { ...options, passive: false });
         this.clear();
+    }
+
+    prepareHovercard(target, options) {
+        // Graphviz emits each tooltip as xlink:title, which browsers show late or not at all.
+        // Keep it as the fallback text and drop native titles so only the card appears.
+        [...this.nodes, ...this.edges].forEach(group => {
+            const link = group.querySelector('a');
+            group.dataset.tip = link?.getAttributeNS('http://www.w3.org/1999/xlink', 'title') ?? '';
+            link?.removeAttributeNS('http://www.w3.org/1999/xlink', 'title');
+            group.querySelectorAll('title').forEach(title => title.remove());
+            const show = event => this.showHovercard(group, event);
+            group.addEventListener('pointerenter', show, options);
+            group.addEventListener('pointermove', show, options);
+            group.addEventListener('pointerleave', () => this.hideHovercard(), options);
+            group.addEventListener('focus', show, options);
+            group.addEventListener('blur', () => this.hideHovercard(), options);
+        });
+        // The graph's own <title> would otherwise show "workflow" over empty canvas.
+        this.svg.querySelectorAll(':scope > g > title').forEach(title => title.remove());
+        this.hovercard?.remove();
+        this.hovercard = document.createElement('div');
+        this.hovercard.className = 'wf-hovercard';
+        this.hovercard.setAttribute('role', 'tooltip');
+        this.hovercard.hidden = true;
+        target.after(this.hovercard);
+    }
+
+    hovercardContent(group) {
+        const places = this.detailsValue.places ?? {};
+        const transitions = this.detailsValue.transitions ?? [];
+        if (group.classList.contains('node')) {
+            const place = places[group.dataset.place];
+            return place ? { title: place.label, code: group.dataset.place, description: place.description } : null;
+        }
+        const transition = transitions[group.dataset.transition];
+        if (!transition) return null;
+        const from = places[group.dataset.from]?.label ?? group.dataset.from;
+        const to = places[group.dataset.to]?.label ?? group.dataset.to;
+        return {
+            title: transition.label,
+            code: `${transition.name} · ${from} → ${to}${transition.async ? ' · async' : ''}`,
+            description: transition.description,
+            guardLabel: transition.guardLabel,
+            guard: transition.guard,
+        };
+    }
+
+    showHovercard(group, event) {
+        if (!this.hovercard || this.drag && this.dragged) return;
+        const content = this.hovercardContent(group) ?? (group.dataset.tip ? { description: group.dataset.tip } : null);
+        if (!content) return this.hideHovercard();
+        const element = (tag, className, text) => {
+            const node = document.createElement(tag);
+            if (className) node.className = className;
+            node.textContent = text;
+            return node;
+        };
+        const parts = [];
+        if (content.title) parts.push(element('strong', '', content.title));
+        if (content.code) parts.push(element('span', 'wf-code', content.code));
+        if (content.description) parts.push(element('p', '', content.description));
+        if (content.guard) {
+            const guard = element('div', 'wf-guard', '');
+            guard.append(element('span', 'wf-eyebrow', content.guardLabel || 'Guard'), element('code', '', content.guard));
+            parts.push(guard);
+        }
+        this.hovercard.replaceChildren(...parts);
+        this.hovercard.hidden = false;
+
+        const container = this.hovercard.offsetParent ?? this.element;
+        const bounds = container.getBoundingClientRect();
+        const anchor = event?.clientX !== undefined
+            ? { x: event.clientX, y: event.clientY }
+            : (({ left, right, bottom }) => ({ x: (left + right) / 2, y: bottom }))(group.getBoundingClientRect());
+        const card = this.hovercard.getBoundingClientRect();
+        let left = anchor.x - bounds.left + 14;
+        let top = anchor.y - bounds.top + 14;
+        if (left + card.width > bounds.width - 8) left = anchor.x - bounds.left - card.width - 14;
+        if (top + card.height > bounds.height - 8) top = anchor.y - bounds.top - card.height - 14;
+        this.hovercard.style.left = `${Math.max(8, left)}px`;
+        this.hovercard.style.top = `${Math.max(8, top)}px`;
+    }
+
+    hideHovercard() {
+        if (this.hovercard) this.hovercard.hidden = true;
     }
 
     select(event) { this.focusPlace(event.currentTarget.dataset.place); }
@@ -199,6 +275,8 @@ export default class extends Controller {
         this.events?.abort();
         this.drag = null;
         this.svg = null;
+        this.hovercard?.remove();
+        this.hovercard = null;
         this.renderer?.destroy();
         this.renderer = null;
     }

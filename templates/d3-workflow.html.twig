@@ -1,6 +1,6 @@
 {% extends ['base.html.twig', '@SurvosState/layout.html.twig'] %}
 {% block page_title "%s Workflow"|format(flowCode) %}
-{% block page_subtitle "Explore the states and the paths between them" %}
+{% block page_subtitle %}{{ survos_workflow_metadata(flowCode, 'description') ?: 'Explore the states and the paths between them' }}{% endblock %}
 {% block stylesheets %}
     {{ parent() }}
     <style>
@@ -58,6 +58,12 @@
         .wf-guard { margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: #f1f5f9; }
         .wf-guard code { display: block; margin-top: 4px; font-size: 10px; color: #334d70; white-space: pre-wrap; overflow-wrap: anywhere; }
         .wf-status { padding: 22px; color: var(--wf-muted); }
+        .wf-canvas { position: relative; }
+        .wf-hovercard { position: absolute; z-index: 5; max-width: 320px; padding: 10px 12px; border: 1px solid #dce3ec; border-radius: 10px; background: #fff; box-shadow: 0 8px 24px #24324722; font-size: 12px; line-height: 1.5; pointer-events: none; }
+        .wf-hovercard strong { display: block; font-size: 13px; }
+        .wf-hovercard .wf-code { margin-top: 1px; }
+        .wf-hovercard p { margin: 6px 0 0; color: var(--wf-ink); }
+        .wf-hovercard .wf-guard { margin-top: 6px; }
         @media (max-width: 1000px) { .wf-layout { grid-template-columns: 1fr; } .wf-places { max-height: 350px; } .wf-graph { height: 60vh; min-height: 400px; } }
         @media (prefers-reduced-motion: reduce) { .wf-graph g.node, .wf-graph g.edge { transition: none; } }
     </style>
@@ -65,7 +71,26 @@
 {% block body %}
     {% set controller = survos_stimulus('state-bundle', 'workflow') %}
     {% set digraphData = digraph is defined ? digraph : workflow_digraph(entity, flowCode) %}
-    <div class="wf-explorer" {{ stimulus_controller(controller, {digraph: digraphData}) }}>
+    {# Hover-card content, keyed by place name and by transition index (the graph's edge ids carry the index). #}
+    {% set placeDetails = {} %}
+    {% for place in definition.places %}
+        {% set placeDetails = placeDetails|merge({(place): {
+            label: survos_workflow_metadata(flowCode, 'label', place) ?: place|replace({'_': ' '})|title,
+            description: survos_workflow_metadata(flowCode, 'description', place),
+        }}) %}
+    {% endfor %}
+    {% set transitionDetails = [] %}
+    {% for t in definition.transitions %}
+        {% set transitionDetails = transitionDetails|merge([{
+            name: t.name,
+            label: survos_workflow_metadata(flowCode, 'label', t) ?: t.name|replace({'_': ' '})|title,
+            description: survos_workflow_metadata(flowCode, 'description', t),
+            guard: survos_workflow_metadata(flowCode, 'guard', t),
+            guardLabel: survos_workflow_metadata(flowCode, 'guardLabel', t),
+            async: survos_workflow_metadata(flowCode, 'async', t) is same as(true),
+        }]) %}
+    {% endfor %}
+    <div class="wf-explorer" {{ stimulus_controller(controller, {digraph: digraphData, details: {places: placeDetails, transitions: transitionDetails}}) }}>
         <div class="wf-layout">
             <section class="wf-canvas" aria-label="Workflow diagram">
                 <header class="wf-toolbar">
@@ -106,10 +131,10 @@
                                 {% if place in definition.initialPlaces %}<span class="wf-tag wf-tag-start">Start</span>{% elseif transitions is empty %}<span class="wf-tag">Terminal</span>{% endif %}
                             </button>
                             <span class="wf-code">{{ place }}</span>
+                            {% if description %}<p class="wf-description">{{ description }}</p>{% endif %}
                             {% set next = survos_workflow_metadata(flowCode, 'next', place)|default([]) %}
                             <code class="wf-next" title="On entry, try these transitions in order; run the first enabled one.">next: {{ next|json_encode }}</code>
                             <div class="wf-details" hidden>
-                                {% if description %}<p class="wf-description">{{ description }}</p>{% endif %}
                                 {% for t in transitions %}
                                     <div class="wf-transition"><strong>{{ survos_workflow_metadata(flowCode, 'label', t) ?: t.name|replace({'_': ' '})|title }}</strong> → {{ t.tos|join(', ')|replace({'_': ' '}) }}
                                         {% if survos_workflow_metadata(flowCode, 'async', t) is same as(true) %}<span class="wf-tag" title="Queued for a worker">Async</span>{% endif %}

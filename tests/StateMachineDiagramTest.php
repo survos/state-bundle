@@ -29,6 +29,22 @@ final class StateMachineDiagramTest extends TestCase
         self::assertStringContainsString('label="Process" style="solid"', $dot);
     }
 
+    public function testEdgeIdsMapEveryPathBackToItsTransitionIndex(): void
+    {
+        // A repeated transition name and a multi-source transition must each stay addressable.
+        $definition = new Definition(['new', 'failed', 'loaded'], [
+            new Transition('load', 'new', 'loaded'),
+            new Transition('load', 'failed', 'loaded'),
+            new Transition('reset', ['loaded', 'failed'], 'new'),
+        ], 'new');
+        $dot = (new SurvosStateMachineGraphVizDumper())->dump($definition);
+
+        self::assertMatchesRegularExpression('/place_new -> place_loaded \[[^\]]*id="wf-transition-0-0"/', $dot);
+        self::assertMatchesRegularExpression('/place_failed -> place_loaded \[[^\]]*id="wf-transition-1-0"/', $dot);
+        self::assertMatchesRegularExpression('/place_loaded -> place_new \[[^\]]*id="wf-transition-2-0"/', $dot);
+        self::assertMatchesRegularExpression('/place_failed -> place_new \[[^\]]*id="wf-transition-2-1"/', $dot);
+    }
+
     public function testTerminalAppearanceFollowsTopology(): void
     {
         $definition = new Definition(['new', 'in_progress', 'done'], [
