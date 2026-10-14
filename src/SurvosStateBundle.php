@@ -263,7 +263,7 @@ final class SurvosStateBundle extends AbstractUxBundle
         // Auto-register a "Workflows" dropdown in the Tabler admin navbar (like every
         // other Survos bundle). Only when tabler-bundle is present; autoconfigure picks
         // up the #[AsEventListener] on the subscriber.
-        if (class_exists(\Survos\TablerBundle\Event\MenuEvent::class)) {
+        if (class_exists(\Survos\TablerBundle\Menu\AbstractAdminMenuSubscriber::class)) {
             $builder->autowire(Menu\StateMenuSubscriber::class)
                 ->setAutowired(true)
                 ->setAutoconfigured(true);

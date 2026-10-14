@@ -6,12 +6,13 @@ namespace Survos\StateBundle\Menu;
 
 use Doctrine\Persistence\ManagerRegistry;
 use Survos\FieldBundle\Registry\EntityMetaRegistry;
+use Survos\MenuBundle\Attribute\AsMenuListener;
+use Survos\MenuBundle\Event\MenuEvent;
+use Survos\MenuBundle\MenuSlot;
 use Survos\StateBundle\Service\WorkflowHelperService;
-use Survos\TablerBundle\Event\MenuEvent;
 use Survos\TablerBundle\Menu\AbstractAdminMenuSubscriber;
 use Survos\TablerBundle\Service\IconService;
 use Survos\TablerBundle\Service\RouteAliasService;
-use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\Routing\RouterInterface;
 
 /**
@@ -54,7 +55,7 @@ final class StateMenuSubscriber extends AbstractAdminMenuSubscriber
         return 'sitemap';
     }
 
-    #[AsEventListener(event: MenuEvent::ADMIN_NAVBAR_MENU)]
+    #[AsMenuListener(MenuSlot::ADMIN_NAVBAR_MENU)]
     public function onAdminNavbarMenu(MenuEvent $event): void
     {
         $names = array_keys($this->workflowHelper->getWorkflowsIndexedByName());
