@@ -37,7 +37,7 @@ Status checked on **9 October 2026**; these links are the source of truth as the
 
 The target replacements are **Symfony 8.2-only**, starting with exact development
 revisions for compatibility testing. Experimental scaffolds now exist in mono for
-[workflow-async](https://github.com/survos/mono/tree/main/bu/workflow-async-bundle) and
+[workflow-messenger](https://github.com/survos/mono/tree/main/bu/workflow-messenger-bundle) and
 [workflow-extras](https://github.com/survos/mono/tree/main/bu/workflow-extras-bundle),
 with a locked packages-inspired example. They are not stable replacements yet. A release must require a Symfony version containing
 its necessary upstream changes; merely selecting an arbitrary 8.2 development
@@ -48,8 +48,8 @@ revision does not guarantee attribute extensibility.
 | Package | Intended responsibility |
 | --- | --- |
 | Symfony Workflow | Native `AsWorkflow`, `Place`, `Transition`, initial marking, definition registration and normal workflow execution. |
-| `survos/workflow-async-bundle` (working name) | Explicitly dispatch transition requests through Messenger; resolve subjects in workers, apply native transitions and select configured transports. Optional transport provisioning is a separate capability. |
-| `survos/workflow-extras-bundle` (working name) | Ordered `next` chaining, workflow iteration commands, metadata conveniences and optional workflow explorer/diagram integration. Delegate queued execution to workflow-async when installed. |
+| `survos/workflow-messenger-bundle` (working name) | Explicitly dispatch transition requests through Messenger; resolve subjects in workers, apply native transitions and select configured transports. Optional transport provisioning is a separate capability. |
+| `survos/workflow-extras-bundle` (working name) | Ordered `next` chaining, workflow iteration commands, metadata conveniences and optional workflow explorer/diagram integration. Delegate queued execution to workflow-messenger when installed. |
 | `survos/state-bundle` | Continue serving existing applications during migration, preserving current attributes and message compatibility. |
 
 `state:iterate` belongs with workflow extras, not the async execution package.
